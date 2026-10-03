@@ -85,7 +85,8 @@ export function AppShell({ children, navItems, showAdmin, iconVersion, teamDispl
       </aside>
 
       <div className="app-column">
-        {/* 移动端：M3 small top app bar（大标题由页面自身渲染） */}
+        {/* 移动端：M3 small top app bar（大标题由页面自身渲染）。
+            不在此放入口按钮：管理入口已在底部导航条里（与桌面导航栏共用同一份 items） */}
         <header className="acrylic-strong app-bar">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -101,17 +102,6 @@ export function AppShell({ children, navItems, showAdmin, iconVersion, teamDispl
           >
             {title}
           </span>
-          <span style={{ flex: 1 }} />
-          {showAdmin && (
-            <Link
-              href="/admin"
-              className="md-icon-btn"
-              aria-label="管理后台"
-              transitionTypes={["nav-fade"]}
-            >
-              {adminItem.icon}
-            </Link>
-          )}
         </header>
 
         {/* 主内容区：包一层 ViewTransition，实现 M3 页面转场
