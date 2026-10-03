@@ -29,7 +29,7 @@ if [ -d "$DEPLOY_DIR" ]; then
   cd "$DEPLOY_DIR"
   git pull || echo "警告: git pull 失败，使用现有代码"
 else
-  git clone https://github.com/yoorme/squad-signup.git "$DEPLOY_DIR"
+  git clone https://github.com/yoorme/squad-signup-latest.git "$DEPLOY_DIR"
   cd "$DEPLOY_DIR"
 fi
 echo "当前代码版本: $(git log --oneline -1)"

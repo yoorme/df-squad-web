@@ -42,7 +42,7 @@
 在服务器上直接运行，可以在一台服务器上安装多个战队网站，共享同一份代码版本，仅数据目录、数据库和端口分离：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yoorme/squad-signup/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/yoorme/squad-signup-latest/main/install.sh | bash
 ```
 
 安装过程会先列出服务器上已存在的战队缩写，然后询问是新增网站还是重新安装已有网站；新增时依次询问：
@@ -70,7 +70,7 @@ DATABASE_URL=... DIRECT_URL=... NEXTAUTH_URL=https://... \
 ### 方式二：Docker Compose
 
 ```bash
-git clone https://github.com/yoorme/squad-signup.git
+git clone https://github.com/yoorme/squad-signup-latest.git
 cd squad-signup
 bash deploy.sh   # 自动生成随机密钥的 .env 并构建启动
 ```
@@ -80,7 +80,7 @@ bash deploy.sh   # 自动生成随机密钥的 .env 并构建启动
 ### 方式三：本地开发
 
 ```bash
-git clone https://github.com/yoorme/squad-signup.git
+git clone https://github.com/yoorme/squad-signup-latest.git
 cd squad-signup
 npm install
 cp .env.example .env   # 填入本地数据库等配置
@@ -98,7 +98,7 @@ Fork 后导入，在 Settings → Environment Variables 配置环境变量（`DA
 安装脚本 `install.sh` 负责新增/重装实例；更新所有实例请使用 `update.sh`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yoorme/squad-signup/main/update.sh | bash
+curl -fsSL https://raw.githubusercontent.com/yoorme/squad-signup-latest/main/update.sh | bash
 ```
 
 `update.sh` 会下载最新共享运行时，并逐个实例执行数据库迁移、重建 systemd 服务并重启；各实例 `.env`、上传图片和数据库数据不会被清除。
