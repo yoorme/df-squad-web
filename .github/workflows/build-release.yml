@@ -45,12 +45,26 @@ jobs:
 
       - name: Upload to GitHub Release (latest + 版本化归档)
         run: |
-          # 覆盖式更新 latest release：服务器 update.sh 固定拉取此产物
-          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest dist.tar.gz \
-            --title "Latest Build" \
-            --notes "Auto-built from commit ${{ github.sha }}" \
-            --target main
+          # 覆盖式更新 latest release：服务器 update.sh 固定拉取此产物。
+          #
+          # 不用「先删除再重建」：
+          #   1. 删除与重建之间有窗口期，此时服务器拉产物会 404；
+          #   2. 更隐蔽的是——当 tag 不存在时由 API 新建的 release，
+          #      GitHub 会把它标成 draft，而草稿对匿名下载不可见（同样 404）。
+          #      实测由此导致过一次线上更新链路中断（latest 变草稿）。
+          # 改为就地覆盖产物，并显式确保处于已发布状态。
+          if gh release list --limit 100 --json tagName --jq '.[].tagName' | grep -qx latest; then
+            gh release upload latest dist.tar.gz --clobber
+            gh release edit latest --draft=false --prerelease=false \
+              --notes "Auto-built from commit ${{ github.sha }}"
+          else
+            gh release create latest dist.tar.gz \
+              --title "Latest Build" \
+              --notes "Auto-built from commit ${{ github.sha }}" \
+              --target main
+            # 兜底：确保不是草稿（草稿无法被服务器匿名下载）
+            gh release edit latest --draft=false --prerelease=false
+          fi
 
           # 归档 build-<sha> 标签，更新异常时可回滚；仅保留最近 5 个
           ARCHIVE_TAG="build-${GITHUB_SHA::7}"
