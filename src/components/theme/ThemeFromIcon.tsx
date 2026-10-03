@@ -76,11 +76,21 @@ function applyTheme(vars: CachedTheme["vars"]) {
 }
 
 /**
- * 从图标中提取种子色：
- * 过滤透明/近灰/过亮过暗像素后，按 4bit 量化投票，取「饱和度加权」最高的色簇均色。
- * 返回 [r,g,b]；没有可用色簇（纯黑白灰图标）时返回 null。
+ * 从图标中提取种子色。
+ *
+ * 使用 Material You 官方取色流程（与安卓端从壁纸取色完全同一套）：
+ * 1. 逐像素转 ARGB（跳过半透明以下像素）
+ * 2. QuantizerCelebi 量化：把上万像素归并成若干代表性色簇
+ * 3. Score 打分：按「色簇占比 + 彩度」排序，并剔除近黑/近白的无彩色
+ * 取评分最高者为种子色。
+ *
+ * 早前版本用自实现的「饱和度加权投票」，在深色底 + 亮色点缀的图标上
+ * 会选中面积很小但饱和度极高的近黑像素（实测取到 #0a1628），
+ * 生成的主题发灰发黑，与图标观感不符；换用官方算法后取到图标的主色蓝 #57b1f3。
+ *
+ * 返回 ARGB 整数；取不到（如全透明）时返回 null。
  */
-async function extractSeed(iconVersion: number): Promise<[number, number, number] | null> {
+async function extractSeedArgb(iconVersion: number): Promise<number | null> {
   const img = new Image();
   img.src = `/favicon.ico?v=${iconVersion}`;
   // decode() 在 ICO 场景下各家浏览器支持度不一，失败则回退到 onload
@@ -100,41 +110,20 @@ async function extractSeed(iconVersion: number): Promise<[number, number, number
   ctx.drawImage(img, 0, 0);
   const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-  const buckets = new Map<number, { weight: number; count: number; r: number; g: number; b: number }>();
-  for (let i = 0; i < data.length; i += 4) {
-    const a = data[i + 3];
-    if (a < 128) continue;
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const sat = max === 0 ? 0 : (max - min) / max;
-    const light = (max + min) / 510; // 0~1
-    // 忽略近灰（无彩度）与接近纯黑/纯白的像素——它们无法体现品牌色
-    if (sat < 0.2 || light > 0.92 || light < 0.08) continue;
-    const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
-    const bucket = buckets.get(key) ?? { weight: 0, count: 0, r: 0, g: 0, b: 0 };
-    bucket.weight += sat; // 仅用于色簇排名：越鲜艳的色簇越可能代表品牌色
-    bucket.count += 1;
-    bucket.r += r;
-    bucket.g += g;
-    bucket.b += b;
-    buckets.set(key, bucket);
-  }
+  const { QuantizerCelebi, Score, argbFromRgb } = await import(
+    "@material/material-color-utilities"
+  );
 
-  let best: { weight: number; count: number; r: number; g: number; b: number } | null = null;
-  for (const bucket of buckets.values()) {
-    if (!best || bucket.weight > best.weight) best = bucket;
+  const pixels: number[] = [];
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 128) continue; // 半透明以下不计入（多为图标留白区）
+    pixels.push(argbFromRgb(data[i], data[i + 1], data[i + 2]));
   }
-  if (!best || best.count === 0) return null;
-  // 均值必须按「像素个数」平均（weight 只是排名用）；
-  // 若用 Σ色值 / Σ饱和度，结果会超出 0~255 得到非法颜色
-  return [
-    Math.round(best.r / best.count),
-    Math.round(best.g / best.count),
-    Math.round(best.b / best.count),
-  ];
+  if (pixels.length === 0) return null;
+
+  const quantized = QuantizerCelebi.quantize(pixels, 128);
+  const ranked = Score.score(quantized);
+  return ranked.length > 0 ? ranked[0] : null;
 }
 
 /**
@@ -143,12 +132,12 @@ async function extractSeed(iconVersion: number): Promise<[number, number, number
  * 生成 SchemeTonalSpot（Material You 默认变体）的浅色/深色两套角色。
  */
 async function buildTheme(iconVersion: number): Promise<CachedTheme | null> {
-  const seed = await extractSeed(iconVersion);
-  if (!seed) return null;
-  const { Hct, SchemeTonalSpot, argbFromRgb, hexFromArgb } = await import(
+  const seedArgb = await extractSeedArgb(iconVersion);
+  if (seedArgb === null) return null;
+  const { Hct, SchemeTonalSpot, hexFromArgb } = await import(
     "@material/material-color-utilities"
   );
-  const hct = Hct.fromInt(argbFromRgb(seed[0], seed[1], seed[2]));
+  const hct = Hct.fromInt(seedArgb);
 
   const buildVars = (dark: boolean): Vars => {
     const scheme = new SchemeTonalSpot(hct, dark, 0);
@@ -162,7 +151,7 @@ async function buildTheme(iconVersion: number): Promise<CachedTheme | null> {
 
   const theme: CachedTheme = {
     v: iconVersion,
-    seed: `#${seed.map((c) => c.toString(16).padStart(2, "0")).join("")}`,
+    seed: hexFromArgb(seedArgb),
     vars: { light: buildVars(false), dark: buildVars(true) },
   };
   try {
