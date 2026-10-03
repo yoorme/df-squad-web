@@ -9,6 +9,7 @@ import { fetcher } from "@/lib/fetcher";
 import { SkeletonList, ErrorState, Empty } from "@/components/ui/StateView";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedFilter } from "@/components/ui/SegmentedFilter";
+import { MaterialIcon } from "@/components/icons/MaterialIcon";
 
 interface AnnouncementListItem {
   id: string;
@@ -137,18 +138,7 @@ export default function AnnouncementsPage() {
                     <span>{item.commentCount} 条留言</span>
                   </div>
                 </div>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  style={{ color: "var(--md-sys-color-on-surface-variant)", flexShrink: 0, marginTop: 4 }}
-                  aria-hidden
-                >
-                  <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <MaterialIcon name="keyboard_arrow_right" size={20} />
               </div>
             </Link>
           ))}

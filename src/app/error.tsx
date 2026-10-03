@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { MaterialIcon } from "@/components/icons/MaterialIcon";
 
 export default function GlobalError({
   error,
@@ -48,10 +49,7 @@ export default function GlobalError({
         }}
         aria-hidden
       >
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M12 3.5l9 15.5H3z" strokeLinejoin="round" />
-          <path d="M12 9.5v4M12 16.5h.01" strokeLinecap="round" />
-        </svg>
+        <MaterialIcon name="warning" size={32} />
       </div>
       <p className="md-typescale-body-large" style={{ color: "var(--md-sys-color-on-surface-variant)" }}>
         页面出错了，请重试

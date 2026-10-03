@@ -8,6 +8,7 @@ import { fetcher } from "@/lib/fetcher";
 import { SkeletonList, ErrorState, Empty } from "@/components/ui/StateView";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedFilter } from "@/components/ui/SegmentedFilter";
+import { MaterialIcon } from "@/components/icons/MaterialIcon";
 
 interface Nature { id: string; name: string; }
 interface Name { id: string; name: string; }
@@ -154,9 +155,7 @@ function EventCard({ event }: { event: EventListItem }) {
             {formatDateTime(event.eventTime)}
           </div>
         </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--win-text-tertiary)", flexShrink: 0, marginTop: 4 }}>
-          <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <MaterialIcon name="keyboard_arrow_right" size={20} />
       </div>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13 }}>

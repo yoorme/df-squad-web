@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { MaterialIcon } from "@/components/icons/MaterialIcon";
 
 type ToastType = "info" | "success" | "error" | "warning";
 interface ToastItem {
@@ -82,31 +83,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     if (!busyRef.current) pumpRef.current();
   }, []);
 
+  // 图标与 App / Material 规范一致（信息 / 完成 / 错误 / 警告）
   const icons: Record<ToastType, ReactNode> = {
-    info: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 11v5M12 8h.01" strokeLinecap="round" />
-      </svg>
-    ),
-    success: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M8.5 12.5l2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-    error: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7.5v5.5M12 16h.01" strokeLinecap="round" />
-      </svg>
-    ),
-    warning: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 3.5l9 15.5H3z" strokeLinejoin="round" />
-        <path d="M12 9.5v4M12 16.5h.01" strokeLinecap="round" />
-      </svg>
-    ),
+    info: <MaterialIcon name="info" size={20} />,
+    success: <MaterialIcon name="check_circle" size={20} />,
+    error: <MaterialIcon name="error" size={20} />,
+    warning: <MaterialIcon name="warning" size={20} />,
   };
 
   return (

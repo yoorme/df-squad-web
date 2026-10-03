@@ -10,6 +10,7 @@ import { Markdown } from "@/components/ui/Markdown";
 import { fetcher } from "@/lib/fetcher";
 import { apiFetch, apiJson } from "@/lib/client-api";
 import { Loading, ErrorState } from "@/components/ui/StateView";
+import { MaterialIcon } from "@/components/icons/MaterialIcon";
 
 interface ImageItem { id?: string; path: string; }
 
@@ -279,9 +280,7 @@ export default function AnnouncementEditorPage() {
                     justifyContent: "center",
                   }}
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 19V5M5 12l7-7 7 7" />
-                  </svg>
+                  <MaterialIcon name="arrow_upward" size={14} />
                 </button>
                 {/* 右上角：从编辑器移除按钮（叉号，清 markdown；保存公告时统一删盘） */}
                 <button

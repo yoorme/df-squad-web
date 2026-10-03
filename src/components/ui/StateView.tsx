@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { MaterialIcon } from "@/components/icons/MaterialIcon";
 
 // 统一的状态展示组件：加载中 / 加载失败（可重试） / 空数据 / 骨架屏
 // 替代各页面重复内联的 "加载中..." 与缺失的错误分支
@@ -36,18 +37,7 @@ export function ErrorState({
 }) {
   return (
     <div style={baseStyle} role="alert">
-      <svg
-        width="32"
-        height="32"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="var(--md-sys-color-error)"
-        strokeWidth="1.8"
-        aria-hidden
-      >
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7.5v5.5M12 16.2h.01" strokeLinecap="round" />
-      </svg>
+      <MaterialIcon name="error" size={32} style={{ color: "var(--md-sys-color-error)" }} />
       <span>{message}</span>
       {onRetry && (
         <button className="win-btn win-btn-secondary" onClick={onRetry}>

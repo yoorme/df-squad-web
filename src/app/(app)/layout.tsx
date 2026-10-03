@@ -5,6 +5,7 @@ import { getSiteSettings } from "@/lib/site-settings";
 import { prefixDisplayName } from "@/lib/constants";
 import { Role } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth-server";
+import { MaterialIcon } from "@/components/icons/MaterialIcon";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
@@ -30,38 +31,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     getSiteSettings(),
   ]);
 
+  // 图标与安卓 App 一致（Material Icons filled）：
+  // 公告 = Campaign，赛事 = EmojiEvents，我的 = Person
   const navItems = [
     {
       href: "/announcements",
       label: "公告",
       badge: unreadAnnouncements,
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M3 11h3l9-5v12l-9-5H3z" strokeLinejoin="round" />
-          <path d="M16 8a3 3 0 0 1 0 8" />
-        </svg>
-      ),
+      icon: <MaterialIcon name="campaign" size={24} />,
     },
     {
       href: "/events",
       label: "赛事",
       badge: unreadEvents,
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <path d="M3 9h18M8 3v4M16 3v4" strokeLinecap="round" />
-        </svg>
-      ),
+      icon: <MaterialIcon name="emoji_events" size={24} />,
     },
     {
       href: "/me",
       label: "我的",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 20c0-4 4-6 8-6s8 2 8 6" strokeLinecap="round" />
-        </svg>
-      ),
+      icon: <MaterialIcon name="person" size={24} />,
     },
   ];
 

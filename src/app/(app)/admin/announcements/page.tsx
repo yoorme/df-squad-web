@@ -10,6 +10,8 @@ import { fetcher } from "@/lib/fetcher";
 import { apiFetch, apiJson } from "@/lib/client-api";
 import { SkeletonList, ErrorState, Empty } from "@/components/ui/StateView";
 import { SegmentedFilter } from "@/components/ui/SegmentedFilter";
+import { MaterialIcon } from "@/components/icons/MaterialIcon";
+import { BackLink } from "@/components/ui/BackLink";
 
 interface AnnouncementItem {
   id: string;
@@ -83,10 +85,7 @@ export default function AdminAnnouncementsPage() {
 
   return (
     <div style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
-      <Link href="/admin" transitionTypes={["nav-back"]} className="md-back-link">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        <span>返回管理首页</span>
-      </Link>
+      <BackLink href="/admin" label="返回管理首页" />
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
         <div>
@@ -177,7 +176,7 @@ export default function AdminAnnouncementsPage() {
             查看全部图片、清理未引用的孤儿文件、释放磁盘空间
           </div>
         </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        <MaterialIcon name="keyboard_arrow_right" size={20} />
       </Link>
     </div>
   );

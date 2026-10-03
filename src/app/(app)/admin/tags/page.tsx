@@ -34,6 +34,7 @@ import {
   reorderTags,
 } from "@/lib/tag-api";
 import type { AdminTagItem, TagType } from "@/types";
+import { MaterialIcon } from "@/components/icons/MaterialIcon";
 
 const TAG_META: Record<TagType, { label: string; hasCategory?: boolean; hasFaction?: boolean; isEventTag?: boolean }> = {
   ability: { label: "能力", hasCategory: true },
@@ -354,11 +355,7 @@ function SortableTagRow({
           }}
           title="拖拽调整顺序"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
-            <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
-            <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
-          </svg>
+          <MaterialIcon name="drag_indicator" size={16} />
         </span>
         <span style={{ fontSize: 14, fontWeight: 500, textDecoration: item.disabled ? "line-through" : "none" }}>
           {item.name}

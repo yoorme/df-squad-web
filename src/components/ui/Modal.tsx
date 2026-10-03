@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { MaterialIcon } from "@/components/icons/MaterialIcon";
 
 interface ModalProps {
   open: boolean;
@@ -143,9 +144,7 @@ export function Modal({ open, onClose, title, children, footer, maxWidth = "540p
               {title}
             </h3>
             <button onClick={onClose} className="md-icon-btn" aria-label="关闭">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-              </svg>
+              <MaterialIcon name="close" size={24} />
             </button>
           </div>
         )}
