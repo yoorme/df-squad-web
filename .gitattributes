@@ -1,0 +1,13 @@
+# ============ 行尾统一 ============
+# 背景：Windows 工作副本在 core.autocrlf=true 时会把文本文件检出为 CRLF，
+# 而 shell 脚本一旦带 CRLF 在 Linux 上执行就会报
+#   bash: $'\r': command not found
+# （曾导致服务器上的 install.sh 无法运行，更新流程中断）。
+# 这里显式声明脚本类文件必须为 LF，任何平台检出都保持一致。
+
+*.sh   text eol=lf
+*.bash text eol=lf
+Dockerfile text eol=lf
+
+# service 单元文件由 install.sh 生成（heredoc），如需入库也应保持 LF
+*.service text eol=lf

@@ -251,10 +251,15 @@ GITHUB_MIRRORS=(
   "https://gh.ddlc.top/"
 )
 
-# 并行测速所有候选源（各下载首 1KB 计时），结果写入 SPEED_URLS（快 → 慢）
-# 候选 = 用户配置的 MIRROR_URL（优先）+ 内置镜像 + GitHub 原生（兜底）
-# 探测失败的源排在最后（探测用 Range 请求，个别不支持 Range 的镜像可能被
-# 误判，但下载循环仍会按顺序尝试它们，不会真正丢失候选）
+# 并行测速所有候选源（各下载 4MB 量取实际吞吐），结果写入 SPEED_URLS（快 → 慢）
+# 候选 = 用户配置的 MIRROR_URL + 内置镜像 + GitHub 原生（兜底）
+#
+# 为什么按吞吐而不是延迟排序：1KB 的 Range 请求测的是 RTT，延迟低的源
+# 带宽未必好（实测 GitHub 原生延迟最低但只有 ~10KB/s，会把整次更新拖成几十分钟）。
+# 这里改为限时下载固定字节数，用 curl 报告的 speed_download 排序。
+#
+# 探测失败的源（速度为 0）排最后；探测用 Range 请求，个别不支持 Range 的镜像
+# 可能被误判，但下载循环仍会按顺序尝试它们，不会真正丢失候选
 probe_sources() {
   local -a prefixes=()
   if [[ -n "$MIRROR_URL" ]]; then
@@ -266,7 +271,7 @@ probe_sources() {
   done
   prefixes+=("")  # 空前缀 = GitHub 原生
 
-  log "测速选择下载源（${#prefixes[@]} 个候选，并行探测）..."
+  log "测速选择下载源（${#prefixes[@]} 个候选，各限时探测 4MB 吞吐）..."
   TMP_PROBE_DIR=$(mktemp -d)
   local -a urls=()
   local i=0 pfx url
@@ -274,40 +279,45 @@ probe_sources() {
     url="${pfx}${DIST_URL}"
     urls+=("$url")
     (
-      t=$(curl -fsS -o /dev/null -w '%{time_total}' \
-            --connect-timeout 4 --max-time 8 -r 0-1023 "$url" 2>/dev/null) || t="999.999"
-      printf '%s' "${t:-999.999}" > "$TMP_PROBE_DIR/$i"
+      # 限时 10s 下载最多 4MB，取 curl 报告的 average speed_download（字节/秒）。
+      # 超时被中断时 curl 仍会输出已测得的速度，因此这里不因退出码丢结果，
+      # 只有完全不可达（输出为空）才记 0
+      sp=$(curl -fsS -o /dev/null -w '%{speed_download}' \
+            --connect-timeout 4 --max-time 10 -r 0-4194303 "$url" 2>/dev/null) || true
+      sp=${sp%%.*}                  # 取整数部分（curl 输出为浮点）
+      [[ -z "$sp" || "$sp" == "0" ]] && sp=0
+      printf '%s' "$sp" > "$TMP_PROBE_DIR/$i"
     ) &
     i=$((i + 1))
   done
   wait
 
-  # 汇总测速结果并按耗时排序（数值升序；999.999 = 不可达，自然排最后）
+  # 汇总测速结果并按吞吐降序排序（0 = 不可达/零速，自然排最后）
   local result_file="$TMP_PROBE_DIR/result"
   : > "$result_file"
   i=0
   for url in "${urls[@]}"; do
-    local t
-    t=$(cat "$TMP_PROBE_DIR/$i" 2>/dev/null || true)
-    [[ -z "$t" ]] && t="999.999"
-    printf '%s %s\n' "$t" "$url" >> "$result_file"
+    local sp
+    sp=$(cat "$TMP_PROBE_DIR/$i" 2>/dev/null || true)
+    [[ -z "$sp" ]] && sp=0
+    printf '%s %s\n' "$sp" "$url" >> "$result_file"
     i=$((i + 1))
   done
 
   SPEED_URLS=()
   local name
-  while read -r t url; do
+  while read -r sp url; do
     [[ -z "${url:-}" ]] && continue
     SPEED_URLS+=("$url")
     name=${url#https://}; name=${name%%/*}
-    if [[ "$t" == "999.999" ]]; then
+    if [[ "$sp" == "0" ]]; then
       printf "  %s✗%s %-22s 不可达\n" "$C_RED" "$C_RESET" "$name" >&2
     else
-      printf "  %s✓%s %-22s %ss\n" "$C_GREEN" "$C_RESET" "$name" "$t" >&2
+      printf "  %s✓%s %-22s %s KB/s\n" "$C_GREEN" "$C_RESET" "$name" "$((sp / 1024))" >&2
     fi
-  done < <(LC_ALL=C sort -k1,1g "$result_file")
+  done < <(LC_ALL=C sort -k1,1gr "$result_file")
   rm -rf "$TMP_PROBE_DIR"; TMP_PROBE_DIR=""
-  ok "已按测速结果确定下载顺序（最快源优先，失败自动切换下一个）"
+  ok "已按下载吞吐确定顺序（带宽最高的源优先，失败自动切换下一个）"
 }
 
 # 从 GitHub Release 下载 dist.tar.gz 并解压
