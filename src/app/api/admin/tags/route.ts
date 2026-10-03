@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
+import type { AbilityCategory } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-server";
 import { ok, fail, withErrorHandler } from "@/lib/api";
+import { regenerateEventTitles } from "@/lib/event-title-sync";
 
 // 标签类型
 type TagType = "ability" | "duty" | "operator" | "nature" | "name" | "squadNature" | "map";
@@ -158,9 +160,16 @@ async function getNextSortOrder(type: TagType): Promise<number> {
   return max + 1;
 }
 
+// 能力分类只允许两个合法值，非法/缺省一律按步兵处理
+function parseAbilityCategory(category?: string): AbilityCategory {
+  return category === "VEHICLE" ? "VEHICLE" : "INFANTRY";
+}
+
 async function createTag(type: TagType, name: string, sortOrder: number, category?: string, faction?: string) {
   if (type === "ability") {
-    return prisma.ability.create({ data: { name, category: (category as any) || "INFANTRY", sortOrder } });
+    return prisma.ability.create({
+      data: { name, category: parseAbilityCategory(category), sortOrder },
+    });
   }
   if (type === "duty") return prisma.duty.create({ data: { name, sortOrder } });
   if (type === "operator") return prisma.operator.create({ data: { name, faction, sortOrder } });
@@ -173,12 +182,29 @@ async function createTag(type: TagType, name: string, sortOrder: number, categor
 
 async function updateTag(type: TagType, id: string, name: string, category?: string, faction?: string) {
   if (type === "ability") {
-    return prisma.ability.update({ where: { id }, data: { name, ...(category && { category: category as any }) } });
+    return prisma.ability.update({
+      where: { id },
+      data: { name, ...(category && { category: parseAbilityCategory(category) }) },
+    });
   }
   if (type === "duty") return prisma.duty.update({ where: { id }, data: { name } });
   if (type === "operator") return prisma.operator.update({ where: { id }, data: { name, faction } });
-  if (type === "nature") return prisma.eventNature.update({ where: { id }, data: { name } });
-  if (type === "name") return prisma.eventName.update({ where: { id }, data: { name } });
+  if (type === "nature") {
+    // 性质改名后，引用它的赛事主体标题（Event.title 冗余字段）必须同步重算，
+    // 否则历史赛事会一直显示旧性质名
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.eventNature.update({ where: { id }, data: { name } });
+      await regenerateEventTitles(tx, { natureId: id });
+      return updated;
+    });
+  }
+  if (type === "name") {
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.eventName.update({ where: { id }, data: { name } });
+      await regenerateEventTitles(tx, { nameId: id });
+      return updated;
+    });
+  }
   if (type === "squadNature") return prisma.squadNature.update({ where: { id }, data: { name } });
   if (type === "map") return prisma.eventMap.update({ where: { id }, data: { name } });
   throw new Error("无效类型");
@@ -222,9 +248,17 @@ async function forceDeleteTag(type: TagType, id: string): Promise<
         return;
       }
       if (type === "name") {
-        // Event.nameId 可空 → 置 null
+        // Event.nameId 可空 → 置 null；先取出受影响赛事（置空后就查不到了），
+        // 稍后重算标题（名称段回退为自定义名称/未知）
+        const affected = await tx.event.findMany({
+          where: { nameId: id },
+          select: { id: true },
+        });
         await tx.event.updateMany({ where: { nameId: id }, data: { nameId: null } });
         await tx.eventName.delete({ where: { id } });
+        if (affected.length > 0) {
+          await regenerateEventTitles(tx, { id: { in: affected.map((e) => e.id) } });
+        }
         return;
       }
       if (type === "squadNature") {
@@ -244,8 +278,8 @@ async function forceDeleteTag(type: TagType, id: string): Promise<
       }
       throw new Error("无效类型");
     });
-  } catch (e: any) {
-    return { error: e.message || "删除失败" };
+  } catch (e: unknown) {
+    return { error: e instanceof Error ? e.message : "删除失败" };
   }
 
   return { cascadeEvents: 0, cascadeSquads: 0, cascadeUsers };

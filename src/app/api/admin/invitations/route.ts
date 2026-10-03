@@ -55,6 +55,8 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   await requireAdmin();
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return fail("缺少 ID");
-  await prisma.invitationCode.delete({ where: { id } });
+  // deleteMany：id 不存在时返回 count=0 而不是抛 P2025（避免 500，语义也更清晰）
+  const result = await prisma.invitationCode.deleteMany({ where: { id } });
+  if (result.count === 0) return fail("邀请码不存在", 404);
   return ok({ success: true });
 });

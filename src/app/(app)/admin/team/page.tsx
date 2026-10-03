@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
-import { Loading } from "@/components/ui/StateView";
+import { Loading, ErrorState } from "@/components/ui/StateView";
+import { fetcher } from "@/lib/fetcher";
+import { apiFetch, apiJson } from "@/lib/client-api";
 import { prefixDisplayName, normalizeTeamPrefix, PREFIX_SEPARATOR } from "@/lib/constants";
 
 interface TeamSettings {
@@ -18,29 +21,22 @@ export default function AdminTeamPage() {
   const confirm = useConfirm();
   const router = useRouter();
 
-  const [settings, setSettings] = useState<TeamSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: settings, error, mutate } = useSWR<TeamSettings>("/api/admin/team", fetcher);
+
   // 前缀仅缩写部分可编辑（分隔符固定为「丨」，展示与拼接由系统处理）
-  const [prefixAbbr, setPrefixAbbr] = useState("");
+  // 输入框初值取服务端前缀去掉尾部分隔符；服务端值变化时（保存后重新拉取）在渲染期同步，
+  // 避免 effect 中 setState 造成的级联渲染
+  const serverAbbr = settings ? prefixDisplayName(settings.teamPrefix) : "";
+  const [syncedAbbr, setSyncedAbbr] = useState(serverAbbr);
+  const [prefixAbbr, setPrefixAbbr] = useState(serverAbbr);
+  if (serverAbbr !== syncedAbbr) {
+    setSyncedAbbr(serverAbbr);
+    setPrefixAbbr(serverAbbr);
+  }
+
   const [savingPrefix, setSavingPrefix] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch("/api/admin/team");
-    const data = await res.json();
-    if (data.ok) {
-      setSettings(data.data);
-      // 去掉尾部分隔符，输入框只展示/编辑缩写部分
-      setPrefixAbbr(prefixDisplayName(data.data.teamPrefix));
-    } else {
-      toast(data.error || "加载失败", "error");
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
 
   const handleSavePrefix = async () => {
     const trimmed = prefixAbbr.trim();
@@ -66,19 +62,17 @@ export default function AdminTeamPage() {
     if (!yes) return;
 
     setSavingPrefix(true);
-    const res = await fetch("/api/admin/team", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamPrefix: fullPrefix }),
+    // apiJson 不抛异常：断网时也能走到下面的复位与提示，按钮不会卡在「保存中…」
+    const data = await apiJson<{ migrated: number }>("/api/admin/team", "PATCH", {
+      teamPrefix: fullPrefix,
     });
-    const data = await res.json();
     setSavingPrefix(false);
     if (data.ok) {
       toast(
         changed ? `已保存，迁移了 ${data.data.migrated} 个用户名` : "已保存",
         "success"
       );
-      load();
+      mutate();
       // 刷新服务端组件：侧边栏品牌名与标签页标题（站点名称）随之自动更新，
       // 无需手动刷新页面
       router.refresh();
@@ -106,12 +100,11 @@ export default function AdminTeamPage() {
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch("/api/admin/team", { method: "POST", body: formData });
-    const data = await res.json();
+    const data = await apiFetch("/api/admin/team", { method: "POST", body: formData });
     setUploading(false);
     if (data.ok) {
       toast("图标已更新", "success");
-      load();
+      mutate();
       // 刷新服务端组件：侧边栏图标与标签页图标（版本号变化）随之自动更新
       router.refresh();
     } else {
@@ -127,11 +120,10 @@ export default function AdminTeamPage() {
       danger: true,
     });
     if (!yes) return;
-    const res = await fetch("/api/admin/team", { method: "DELETE" });
-    const data = await res.json();
+    const data = await apiFetch("/api/admin/team", { method: "DELETE" });
     if (data.ok) {
       toast("已恢复默认图标", "success");
-      load();
+      mutate();
       // 刷新服务端组件：侧边栏图标与标签页图标随之恢复默认
       router.refresh();
     } else {
@@ -139,7 +131,10 @@ export default function AdminTeamPage() {
     }
   };
 
-  if (loading || !settings) {
+  if (error && !settings) {
+    return <ErrorState message={error.message || "加载失败"} onRetry={() => mutate()} />;
+  }
+  if (!settings) {
     return <Loading />;
   }
 
@@ -154,37 +149,20 @@ export default function AdminTeamPage() {
       <div className="win-card" style={{ padding: 20, marginBottom: 16 }}>
         <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>战队名称前缀</h2>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-          <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
+          <div className="md-field-group" style={{ flex: 1 }}>
             <input
               className="win-input"
               type="text"
               placeholder="战队缩写，留空 = 无前缀"
+              aria-label="战队缩写"
               value={prefixAbbr}
               maxLength={12}
               // 分隔符由系统固定拼接，输入中不允许出现分隔符字符
               onChange={(e) => setPrefixAbbr(e.target.value.replace(/[丨|｜]/g, ""))}
-              style={{
-                flex: 1,
-                borderTopRightRadius: prefixAbbr.trim() ? 0 : undefined,
-                borderBottomRightRadius: prefixAbbr.trim() ? 0 : undefined,
-              }}
             />
             {prefixAbbr.trim() && (
               // 固定分隔符：不可编辑（仅缩写部分可修改）
-              <span
-                className="win-input"
-                style={{
-                  flexShrink: 0,
-                  width: "auto",
-                  borderLeft: "none",
-                  borderTopLeftRadius: 0,
-                  borderBottomLeftRadius: 0,
-                  color: "var(--win-text-tertiary)",
-                  background: "var(--win-bg-hover)",
-                }}
-              >
-                {PREFIX_SEPARATOR}
-              </span>
+              <span className="md-field-suffix">{PREFIX_SEPARATOR}</span>
             )}
           </div>
           <button

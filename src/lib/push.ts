@@ -76,25 +76,29 @@ async function sendToRegistrationIds(
 }
 
 // 给指定用户集合推送（自动查找其已启用的设备并分批发送）
-// 返回实际推送的用户数
+// 返回「成功下发到至少一台设备的用户」集合：
+// 调用方据此记账（写 PushLog），避免给没有设备/发送失败的用户也记为已推送，
+// 否则这些用户之后绑定设备将永远收不到该条通知
 async function pushToUsers(
   userIds: string[],
   payload: PushPayload
-): Promise<number> {
-  if (userIds.length === 0) return 0;
+): Promise<Set<string>> {
+  const sentUsers = new Set<string>();
+  if (userIds.length === 0) return sentUsers;
   const devices = await prisma.device.findMany({
     where: { userId: { in: userIds }, enabled: true },
     select: { userId: true, registrationId: true },
   });
-  if (devices.length === 0) return 0;
+  if (devices.length === 0) return sentUsers;
 
-  const regIds = devices.map((d) => d.registrationId);
-  let okAll = true;
-  for (let i = 0; i < regIds.length; i += CHUNK_SIZE) {
-    const okChunk = await sendToRegistrationIds(regIds.slice(i, i + CHUNK_SIZE), payload);
-    if (!okChunk) okAll = false;
+  for (let i = 0; i < devices.length; i += CHUNK_SIZE) {
+    const chunk = devices.slice(i, i + CHUNK_SIZE);
+    const okChunk = await sendToRegistrationIds(chunk.map((d) => d.registrationId), payload);
+    if (okChunk) {
+      for (const d of chunk) sentUsers.add(d.userId);
+    }
   }
-  return okAll ? new Set(devices.map((d) => d.userId)).size : 0;
+  return sentUsers;
 }
 
 // ============ 业务推送（调用方 fire-and-forget：void pushXxx().catch(...)）============
@@ -111,16 +115,16 @@ export async function pushNewEvent(eventId: string, title: string, timeText: str
   const userIds = users
     .filter((u) => u.notificationSetting?.notifyNewEvent ?? true)
     .map((u) => u.id);
-  const sentCount = await pushToUsers(userIds, {
+  const sentUsers = await pushToUsers(userIds, {
     title: "新比赛发布",
     content: title + (timeText ? `（${timeText}）` : ""),
     extras: { type: "NEW_EVENT", eventId },
   });
-  // 去重日志：同一用户同一赛事只推一次（调试与审计用）
-  if (sentCount > 0) {
+  // 去重日志：同一用户同一赛事只推一次（调试与审计用），仅记录实际送达的用户
+  if (sentUsers.size > 0) {
     await prisma.pushLog
       .createMany({
-        data: userIds.map((userId) => ({
+        data: [...sentUsers].map((userId) => ({
           userId,
           dedupKey: `new_event:${eventId}`,
         })),
@@ -145,15 +149,15 @@ export async function pushNewAnnouncement(
   const userIds = users
     .filter((u) => u.notificationSetting?.notifyAnnouncement ?? true)
     .map((u) => u.id);
-  const sentCount = await pushToUsers(userIds, {
+  const sentUsers = await pushToUsers(userIds, {
     title: "新公告",
     content: title,
     extras: { type: "NEW_ANNOUNCEMENT", announcementId },
   });
-  if (sentCount > 0) {
+  if (sentUsers.size > 0) {
     await prisma.pushLog
       .createMany({
-        data: userIds.map((userId) => ({
+        data: [...sentUsers].map((userId) => ({
           userId,
           dedupKey: `new_announcement:${announcementId}`,
         })),
@@ -164,19 +168,18 @@ export async function pushNewAnnouncement(
 }
 
 // 比赛临近提醒：给指定报名用户按其设置的提前量推送
-// 返回是否至少向一个设备成功下发（用于提醒日志的去重记账）
+// 返回「实际送达的用户」集合（用于提醒日志的去重记账，只记真正推送成功的人）
 export async function pushEventReminder(
   eventId: string,
   title: string,
   minutesLeft: number,
   userIds: string[]
-): Promise<boolean> {
-  if (userIds.length === 0) return false;
+): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
   const minutesText = minutesLeft >= 60 ? `${Math.round(minutesLeft / 60)} 小时` : `${minutesLeft} 分钟`;
-  const sentCount = await pushToUsers(userIds, {
+  return pushToUsers(userIds, {
     title: "比赛即将开始",
     content: `${title} 将于 ${minutesText} 后开始`,
     extras: { type: "EVENT_REMINDER", eventId },
   });
-  return sentCount > 0;
 }

@@ -1,10 +1,9 @@
-import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-server";
 import { ok, withErrorHandler } from "@/lib/api";
 
 // 获取所有标签（赛事性质、赛事名称、分队性质、地图）
-export const GET = withErrorHandler(async (req: NextRequest) => {
+export const GET = withErrorHandler(async () => {
   await requireUser();
   const [natures, names, squadNatures, maps] = await Promise.all([
     prisma.eventNature.findMany({ where: { disabled: false }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }),

@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { BackLink } from "@/components/ui/BackLink";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { Markdown } from "@/components/ui/Markdown";
-import { Loading } from "@/components/ui/StateView";
+import { fetcher } from "@/lib/fetcher";
+import { apiFetch, apiJson } from "@/lib/client-api";
+import { Loading, ErrorState } from "@/components/ui/StateView";
 
 interface ImageItem { id?: string; path: string; }
 
@@ -20,28 +24,28 @@ export default function AnnouncementEditorPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [images, setImages] = useState<ImageItem[]>([]);
-  const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
-  const load = async () => {
-    if (!isEdit) return;
-    const res = await fetch(`/api/announcements?mode=detail&id=${params.id}`);
-    const data = await res.json();
-    if (data.ok) {
-      setTitle(data.data.title);
-      setContent(data.data.contentMarkdown);
-      setImages(data.data.images.map((img: any) => ({ id: img.id, path: img.path })));
-    } else {
-      toast(data.error || "加载失败", "error");
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
+  // 编辑模式：加载既有公告并播种表单（新建时不发请求，key 为 null）
+  const {
+    isLoading: loading,
+    error: loadError,
+    mutate: reload,
+  } = useSWR<{
+    title: string;
+    contentMarkdown: string;
+    images: ImageItem[];
+  }>(isEdit ? `/api/announcements?mode=detail&id=${encodeURIComponent(params.id!)}` : null, fetcher, {
+    onSuccess: (data) => {
+      setTitle(data.title);
+      setContent(data.contentMarkdown);
+      setImages(data.images.map((img) => ({ id: img.id, path: img.path })));
+    },
+  });
 
   const handleUpload = async (files: FileList) => {
     if (files.length === 0) return;
@@ -53,10 +57,12 @@ export default function AnnouncementEditorPage() {
     for (const file of Array.from(files)) {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
+      const data = await apiFetch<{ path: string }>("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
       if (data.ok) {
-        const imgPath = data.data.path as string;
+        const imgPath = data.data.path;
         setImages((prev) => [...prev, { path: imgPath }]);
         // 仅插入到 Markdown 内容（不再二次展示，避免重复）
         setContent((prev) => `${prev}\n\n![图片](${imgPath})\n`);
@@ -120,13 +126,14 @@ export default function AnnouncementEditorPage() {
     }
     setSaving(true);
     const imagePaths = images.map((i) => i.path);
+    // apiJson 不会抛异常：断网/非 JSON 响应时也能复位 saving 并给出提示
     if (isEdit) {
-      const res = await fetch("/api/announcements", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: params.id, title: title.trim(), contentMarkdown: content, images: imagePaths }),
+      const data = await apiJson("/api/announcements", "PATCH", {
+        id: params.id,
+        title: title.trim(),
+        contentMarkdown: content,
+        images: imagePaths,
       });
-      const data = await res.json();
       setSaving(false);
       if (data.ok) {
         toast("保存成功", "success");
@@ -135,12 +142,11 @@ export default function AnnouncementEditorPage() {
         toast(data.error || "保存失败", "error");
       }
     } else {
-      const res = await fetch("/api/announcements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), contentMarkdown: content, images: imagePaths }),
+      const data = await apiJson("/api/announcements", "POST", {
+        title: title.trim(),
+        contentMarkdown: content,
+        images: imagePaths,
       });
-      const data = await res.json();
       setSaving(false);
       if (data.ok) {
         toast("发布成功", "success");
@@ -154,13 +160,16 @@ export default function AnnouncementEditorPage() {
   if (loading) {
     return <Loading />;
   }
+  // 编辑模式下加载失败：不渲染空表单，避免误保存覆盖原内容
+  if (isEdit && loadError) {
+    return (
+      <ErrorState message={loadError.message || "加载公告失败"} onRetry={() => reload()} />
+    );
+  }
 
   return (
     <div style={{ maxWidth: 880, margin: "0 auto" }}>
-      <Link href="/admin/announcements" style={{ fontSize: 13, color: "var(--win-text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        返回公告管理
-      </Link>
+      <div style={{ marginBottom: 12 }}><BackLink href="/admin/announcements" label="返回公告管理" /></div>
 
       <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 24 }}>{isEdit ? "编辑公告" : "发布公告"}</h1>
 
@@ -181,34 +190,22 @@ export default function AnnouncementEditorPage() {
         <div className="win-card" style={{ padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <label className="win-label" style={{ margin: 0 }}>内容（Markdown）</label>
-            <div style={{ display: "flex", gap: 4, padding: 4, background: "var(--win-bg-hover)", borderRadius: 4 }}>
+            <div className="md-segmented" role="group" aria-label="编辑/预览切换" style={{ height: 36 }}>
               <button
+                type="button"
+                data-selected={!previewMode}
+                aria-pressed={!previewMode}
                 onClick={() => setPreviewMode(false)}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 3,
-                  border: "none",
-                  background: !previewMode ? "var(--win-bg-card-solid)" : "transparent",
-                  color: !previewMode ? "var(--win-accent)" : "var(--win-text-secondary)",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  fontWeight: !previewMode ? 600 : 400,
-                }}
+                style={{ height: 36, padding: "0 14px", fontSize: 13 }}
               >
                 编辑
               </button>
               <button
+                type="button"
+                data-selected={previewMode}
+                aria-pressed={previewMode}
                 onClick={() => setPreviewMode(true)}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 3,
-                  border: "none",
-                  background: previewMode ? "var(--win-bg-card-solid)" : "transparent",
-                  color: previewMode ? "var(--win-accent)" : "var(--win-text-secondary)",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  fontWeight: previewMode ? 600 : 400,
-                }}
+                style={{ height: 36, padding: "0 14px", fontSize: 13 }}
               >
                 预览
               </button>
@@ -216,7 +213,14 @@ export default function AnnouncementEditorPage() {
           </div>
 
           {previewMode ? (
-            <div style={{ minHeight: 300, padding: 12, background: "var(--win-bg-hover)", borderRadius: 6 }}>
+            <div
+              style={{
+                minHeight: 300,
+                padding: 16,
+                background: "var(--md-sys-color-surface-container-high)",
+                borderRadius: "var(--md-sys-shape-corner-medium)",
+              }}
+            >
               <Markdown content={content} />
             </div>
           ) : (
@@ -248,6 +252,7 @@ export default function AnnouncementEditorPage() {
                   border: "1px solid var(--win-border)",
                 }}
               >
+              {/* eslint-disable-next-line @next/next/no-img-element -- 上传图片尺寸不定，按容器裁切展示；next/image 需固定宽高且会重编码 */}
                 <img
                   src={img.path}
                   alt=""
@@ -361,6 +366,7 @@ export default function AnnouncementEditorPage() {
             padding: 24,
           }}
         >
+          {/* eslint-disable-next-line @next/next/no-img-element -- 预览图为用户上传内容，尺寸不定 */}
           <img
             src={previewImg}
             alt="预览"

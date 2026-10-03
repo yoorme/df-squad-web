@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
+import { BackLink } from "@/components/ui/BackLink";
+import useSWR from "swr";
 import {
   DndContext,
   closestCenter,
@@ -22,9 +23,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { Modal } from "@/components/ui/Modal";
-import { Loading, Empty } from "@/components/ui/StateView";
+import { SkeletonList, ErrorState, Empty } from "@/components/ui/StateView";
+import { SegmentedFilter } from "@/components/ui/SegmentedFilter";
+import { fetcher } from "@/lib/fetcher";
 import {
-  fetchTags,
   createTag,
   updateTag,
   deleteTag,
@@ -43,6 +45,17 @@ const TAG_META: Record<TagType, { label: string; hasCategory?: boolean; hasFacti
   map: { label: "赛事地图", isEventTag: true },
 };
 
+// 类型筛选项：顺序与 TAG_META 声明一致
+const TYPE_FILTERS = [
+  { value: "ability" as const, label: TAG_META.ability.label },
+  { value: "duty" as const, label: TAG_META.duty.label },
+  { value: "operator" as const, label: TAG_META.operator.label },
+  { value: "nature" as const, label: TAG_META.nature.label },
+  { value: "name" as const, label: TAG_META.name.label },
+  { value: "squadNature" as const, label: TAG_META.squadNature.label },
+  { value: "map" as const, label: TAG_META.map.label },
+];
+
 // 弹窗表单状态：null=关闭；{ mode: "create" }=新增；{ mode: "edit", target }=编辑
 type FormState =
   | { mode: "create" }
@@ -51,8 +64,6 @@ type FormState =
 
 export default function AdminTagsPage() {
   const [activeType, setActiveType] = useState<TagType>("ability");
-  const [items, setItems] = useState<AdminTagItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState>(null);
 
   const [name, setName] = useState("");
@@ -67,13 +78,13 @@ export default function AdminTagsPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const load = async () => {
-    setLoading(true);
-    setItems(await fetchTags<AdminTagItem>(activeType));
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, [activeType]);
+  // 类型切换时保留上一类型的列表，避免"清空→骨架屏→新列表"的闪烁
+  const { data, error, isLoading, mutate } = useSWR<AdminTagItem[]>(
+    `/api/admin/tags?type=${activeType}`,
+    fetcher,
+    { keepPreviousData: true }
+  );
+  const items = data ?? [];
 
   const openCreate = () => {
     setName("");
@@ -108,7 +119,7 @@ export default function AdminTagsPage() {
     if (data.ok) {
       toast(form.mode === "create" ? "创建成功" : "修改成功", "success");
       setForm(null);
-      load();
+      mutate();
     } else {
       toast(data.error || (form.mode === "create" ? "创建失败" : "修改失败"), "error");
     }
@@ -120,7 +131,7 @@ export default function AdminTagsPage() {
     const data = await toggleTagDisabled(activeType, item.id, next);
     if (data.ok) {
       toast(next ? "已禁用" : "已启用", "success");
-      load();
+      mutate();
     } else {
       toast(data.error || "操作失败", "error");
     }
@@ -169,13 +180,13 @@ export default function AdminTagsPage() {
       if (d.cascadeSquads) parts.push(`分队 ${d.cascadeSquads}`);
       if (d.cascadeUsers) parts.push(`用户关联 ${d.cascadeUsers}`);
       toast(parts.join("｜"), "success");
-      load();
+      mutate();
     } else {
       toast(data.error || "删除失败", "error");
     }
   };
 
-  // 拖拽结束：本地立即更新顺序，异步持久化到服务端
+  // 拖拽结束：本地立即更新顺序（乐观写入缓存，不触发重新请求），异步持久化到服务端
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -183,20 +194,18 @@ export default function AdminTagsPage() {
     const newIndex = items.findIndex((i) => i.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
     const next = arrayMove(items, oldIndex, newIndex);
-    setItems(next);
+    await mutate(next, { revalidate: false });
     const data = await reorderTags(activeType, next.map((i) => i.id));
     if (!data.ok) {
       toast(data.error || "排序失败", "error");
-      load();
+      // 持久化失败：重新拉取以恢复服务端顺序
+      mutate();
     }
   };
 
   return (
     <div style={{ maxWidth: 880, margin: "0 auto" }}>
-      <Link href="/admin" style={{ fontSize: 13, color: "var(--win-text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        返回管理首页
-      </Link>
+      <div style={{ marginBottom: 12 }}><BackLink href="/admin" label="返回管理首页" /></div>
 
       <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 4 }}>标签维护</h1>
       <p style={{ fontSize: 13, color: "var(--win-text-secondary)", marginBottom: 24 }}>
@@ -204,26 +213,13 @@ export default function AdminTagsPage() {
       </p>
 
       {/* 类型切换 */}
-      <div style={{ display: "flex", gap: 4, padding: 4, background: "var(--win-bg-hover)", borderRadius: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {(Object.keys(TAG_META) as TagType[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setActiveType(t)}
-            style={{
-              padding: "8px 14px",
-              borderRadius: 4,
-              border: "none",
-              background: activeType === t ? "var(--win-bg-card-solid)" : "transparent",
-              color: activeType === t ? "var(--win-accent)" : "var(--win-text-secondary)",
-              fontSize: 13,
-              cursor: "pointer",
-              fontWeight: activeType === t ? 600 : 400,
-              boxShadow: activeType === t ? "var(--win-shadow-card)" : "none",
-            }}
-          >
-            {TAG_META[t].label}
-          </button>
-        ))}
+      <div style={{ marginBottom: 16 }}>
+        <SegmentedFilter
+          options={TYPE_FILTERS}
+          value={activeType}
+          onChange={setActiveType}
+          ariaLabel="标签类型筛选"
+        />
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -234,8 +230,10 @@ export default function AdminTagsPage() {
       </div>
 
       {/* 列表 */}
-      {loading ? (
-        <Loading />
+      {isLoading && !data ? (
+        <SkeletonList count={4} />
+      ) : error && !data ? (
+        <ErrorState message={error.message || "加载失败"} onRetry={() => mutate()} />
       ) : items.length === 0 ? (
         <div className="win-card" style={{ overflow: "hidden" }}>
           <Empty text="暂无标签" />

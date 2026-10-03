@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth-server";
 import { ok, fail, withErrorHandler } from "@/lib/api";
 import { getUploadDir } from "@/lib/upload-dir";
+import { isErrno } from "@/lib/errors";
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
@@ -57,8 +58,8 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
 
   try {
     await unlink(fullPath);
-  } catch (e: any) {
-    if (e.code === "ENOENT") return ok({ deleted: false, reason: "文件不存在" });
+  } catch (e: unknown) {
+    if (isErrno(e, "ENOENT")) return ok({ deleted: false, reason: "文件不存在" });
     throw e;
   }
   return ok({ deleted: true });

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
-import { Loading, ErrorState } from "@/components/ui/StateView";
+import { SkeletonDetail, ErrorState } from "@/components/ui/StateView";
+import { BackLink } from "@/components/ui/BackLink";
 import { formatDateTime } from "@/lib/constants";
 import { fetcher } from "@/lib/fetcher";
 import type { EventDetail, EventMember, MyRegistration } from "@/types";
@@ -18,6 +19,9 @@ export default function EventDetailPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const myUserId = session?.user?.id;
+  // 报名操作去重：连点两次会发出两个 POST，虽然唯一索引能保证数据一致，
+  // 但第二次会返回"您已报名"的误导提示；网络异常也会让按钮悬空
+  const [pendingAction, setPendingAction] = useState(false);
 
   // SWR 数据层：15 秒自动轮询（归档后停止）、页面重新聚焦时刷新、请求去重
   const {
@@ -59,8 +63,8 @@ export default function EventDetailPage() {
     return mutate();
   };
 
-  if (isLoading) {
-    return <Loading />;
+  if (isLoading && !event) {
+    return <SkeletonDetail />;
   }
   if (error) {
     const status = (error as { status?: number }).status;
@@ -78,27 +82,35 @@ export default function EventDetailPage() {
 
   // 队员报名
   const handleRegister = async (squadId: string | null, asSubstitute: boolean) => {
-    const res = await fetch("/api/events/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventId: event.id, squadId, asSubstitute }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      // 若服务端因分队满员回退为替补
-      if (data.data?.fellbackToSubstitute) {
-        toast(data.data.message || "该分队已满，已自动加入替补", "warning");
+    if (pendingAction) return;
+    setPendingAction(true);
+    try {
+      const res = await fetch("/api/events/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id, squadId, asSubstitute }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        // 若服务端因分队满员回退为替补
+        if (data.data?.fellbackToSubstitute) {
+          toast(data.data.message || "该分队已满，已自动加入替补", "warning");
+        } else {
+          toast(asSubstitute ? "已加入替补" : "报名成功", "success");
+        }
+        reloadAfterMutation();
       } else {
-        toast(asSubstitute ? "已加入替补" : "报名成功", "success");
+        toast(data.error || "报名失败", "error");
       }
-      reloadAfterMutation();
-    } else {
-      toast(data.error || "报名失败", "error");
+    } catch {
+      toast("网络错误，请稍后重试", "error");
+    } finally {
+      setPendingAction(false);
     }
   };
 
   const handleCancel = async () => {
-    if (!myReg) return;
+    if (!myReg || pendingAction) return;
     const yes = await confirm({
       title: "取消报名",
       message: "确定要取消报名吗？取消后可重新报名。",
@@ -109,41 +121,32 @@ export default function EventDetailPage() {
     // 找到我的 registrationId
     const regId = findMyRegistrationId(event, myUserId);
     if (!regId) return toast("未找到报名记录", "error");
-    const res = await fetch(`/api/events/register?registrationId=${regId}`, { method: "DELETE" });
-    const data = await res.json();
-    if (data.ok) {
-      toast("已取消报名", "success");
-      reloadAfterMutation();
-    } else {
-      // 409 表示报名记录已被其他操作改变（如管理员已移动）
-      if (res.status === 409) {
-        toast(data.error || "报名状态已变化", "warning");
+    setPendingAction(true);
+    try {
+      const res = await fetch(`/api/events/register?registrationId=${regId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.ok) {
+        toast("已取消报名", "success");
         reloadAfterMutation();
       } else {
-        toast(data.error || "取消失败", "error");
+        // 409 表示报名记录已被其他操作改变（如管理员已移动）
+        if (res.status === 409) {
+          toast(data.error || "报名状态已变化", "warning");
+          reloadAfterMutation();
+        } else {
+          toast(data.error || "取消失败", "error");
+        }
       }
+    } catch {
+      toast("网络错误，请稍后重试", "error");
+    } finally {
+      setPendingAction(false);
     }
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 1080, margin: "0 auto" }}>
-      <Link
-        href="/events"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          fontSize: 13,
-          color: "var(--win-text-secondary)",
-          textDecoration: "none",
-          alignSelf: "flex-start",
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        返回赛事列表
-      </Link>
+      <BackLink href="/events" label="返回赛事列表" />
 
       {/* 赛事头部 */}
       <div className="win-card" style={{ padding: 20 }}>
@@ -197,6 +200,7 @@ export default function EventDetailPage() {
         event={event}
         myReg={myReg}
         myUserId={myUserId}
+        pending={pendingAction}
         onRegister={handleRegister}
         onCancel={handleCancel}
       />
@@ -219,12 +223,14 @@ function SquadDisplayView({
   event,
   myReg,
   myUserId,
+  pending,
   onRegister,
   onCancel,
 }: {
   event: EventDetail;
   myReg: MyRegistration | null;
   myUserId?: string;
+  pending?: boolean;
   onRegister: (squadId: string | null, asSubstitute: boolean) => void;
   onCancel: () => void;
 }) {
@@ -238,7 +244,16 @@ function SquadDisplayView({
       {/* 分队列表 */}
       <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
         {/* 表头 */}
-        <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", padding: "8px 12px", borderBottom: "2px solid var(--win-border)", fontSize: 12, color: "var(--win-text-secondary)", fontWeight: 600 }}>
+        <div
+          className="md-typescale-label-medium"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "120px 1fr",
+            padding: "8px 12px",
+            borderBottom: "1px solid var(--md-sys-color-outline-variant)",
+            color: "var(--md-sys-color-on-surface-variant)",
+          }}
+        >
           <div>分队性质</div>
           <div>成员</div>
         </div>
@@ -254,9 +269,10 @@ function SquadDisplayView({
                 display: "grid",
                 gridTemplateColumns: "120px 1fr",
                 padding: "12px",
-                borderBottom: "1px solid var(--win-border)",
+                borderBottom: "1px solid var(--md-sys-color-outline-variant)",
                 alignItems: "center",
-                background: isMySquad ? "var(--win-bg-selected)" : "transparent",
+                borderRadius: "var(--md-sys-shape-corner-small)",
+                background: isMySquad ? "var(--md-sys-color-secondary-container)" : "transparent",
               }}
             >
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -274,8 +290,9 @@ function SquadDisplayView({
                 {canJoin && (
                   <button
                     onClick={() => onRegister(s.id, false)}
-                    className="win-btn win-btn-primary"
-                    style={{ fontSize: 12, padding: "4px 10px", minHeight: 26, marginLeft: 4 }}
+                    className="win-btn win-btn-primary win-btn-sm"
+                    disabled={pending}
+                    style={{ marginLeft: 4 }}
                   >
                     + 报名
                   </button>
@@ -310,8 +327,9 @@ function SquadDisplayView({
             {!isArchived && !myReg && (
               <button
                 onClick={() => onRegister(null, true)}
-                className="win-btn win-btn-secondary"
-                style={{ fontSize: 12, padding: "4px 10px", minHeight: 26, marginLeft: 4 }}
+                className="win-btn win-btn-secondary win-btn-sm"
+                disabled={pending}
+                style={{ marginLeft: 4 }}
               >
                 + 加入替补
               </button>
@@ -323,7 +341,7 @@ function SquadDisplayView({
       {/* 我的报名操作 */}
       {myReg && !isArchived && (
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--win-border)", display: "flex", justifyContent: "center" }}>
-          <button onClick={onCancel} className="win-btn win-btn-danger">
+          <button onClick={onCancel} className="win-btn win-btn-danger" disabled={pending}>
             取消报名
           </button>
         </div>

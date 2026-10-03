@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth-server";
 import { ok, fail, withErrorHandler } from "@/lib/api";
 import bcrypt from "bcryptjs";
 // 用户管理 - 获取列表
-export const GET = withErrorHandler(async (req: NextRequest) => {
+export const GET = withErrorHandler(async () => {
   await requireAdmin();
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "asc" },
@@ -114,7 +114,8 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  // 统计将删除的关联数据数量（用于响应和日志）
+  // 统计将删除的关联数据数量（用于响应和日志）。
+  // registrations 统计全部记录（含已取消的软删除记录），与级联删除范围保持一致
   const [regCount, annCount, eventCount, inviteCount] = await Promise.all([
     prisma.registration.count({ where: { userId: id } }),
     prisma.announcement.count({ where: { authorId: id } }),

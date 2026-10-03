@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { BackLink } from "@/components/ui/BackLink";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { calculateSquadCount } from "@/lib/constants";
+import { fetcher } from "@/lib/fetcher";
+import { apiJson } from "@/lib/client-api";
 import { Loading } from "@/components/ui/StateView";
 
 interface TagItem { id: string; name: string; }
@@ -20,7 +24,6 @@ export default function NewEventPage() {
   const toast = useToast();
 
   const [tags, setTags] = useState<Tags>({ natures: [], names: [], squadNatures: [], maps: [] });
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [eventTime, setEventTime] = useState("");
@@ -35,37 +38,36 @@ export default function NewEventPage() {
   const [squadNatures, setSquadNatures] = useState<string[]>([]);
   const [opponent, setOpponent] = useState("");
 
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch("/api/tags");
-    const data = await res.json();
-    if (data.ok) {
-      setTags(data.data);
-      if (data.data.natures.length > 0) setNatureId(data.data.natures[0].id);
-      if (data.data.names.length > 0) {
-        setNameId(data.data.names[0].id);
+  // 标签数据：SWR 拉取，成功后播种默认值（避免在 effect 中同步 setState）
+  const { isLoading: loading } = useSWR<Tags>("/api/tags", fetcher, {
+    onSuccess: (data) => {
+      setTags(data);
+      if (data.natures.length > 0) setNatureId(data.natures[0].id);
+      if (data.names.length > 0) {
+        setNameId(data.names[0].id);
         setNameMode("tag");
       }
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
+    },
+  });
 
   // 自动计算分队数量
   const teamCount = calculateSquadCount(Number(requiredCount) || 1);
 
-  // 当分队数量变化或可选标签加载完成时，自动调整 squadNatures 数组
-  useEffect(() => {
-    const defaultId = tags.squadNatures[0]?.id || "";
+  // 分队数量或可用标签变化时调整 squadNatures：
+  // 采用「渲染期调整 state」而非 useEffect，避免级联渲染
+  const defaultSquadNatureId = tags.squadNatures[0]?.id || "";
+  const squadSignature = `${teamCount}|${defaultSquadNatureId}`;
+  const [prevSquadSignature, setPrevSquadSignature] = useState(squadSignature);
+  if (squadSignature !== prevSquadSignature) {
+    setPrevSquadSignature(squadSignature);
     setSquadNatures((prev) => {
       const next = [...prev];
-      while (next.length < teamCount) next.push(defaultId);
+      while (next.length < teamCount) next.push(defaultSquadNatureId);
       while (next.length > teamCount) next.pop();
       // 回填因 tags 未加载而残留的空值
-      return next.map((id) => (id || defaultId));
+      return next.map((id) => id || defaultSquadNatureId);
     });
-  }, [teamCount, tags.squadNatures]);
+  }
 
   const handleSave = async () => {
     if (!eventTime) {
@@ -99,22 +101,18 @@ export default function NewEventPage() {
       return;
     }
     setSaving(true);
-    const res = await fetch("/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        eventTime,
-        natureId,
-        nameId: nameMode === "tag" ? nameId : null,
-        customName: nameMode === "other" ? customName.trim() : null,
-        mapId: mapId || null,
-        requiredCount: requiredNum,
-        format,
-        squadNatures,
-        opponent: opponent.trim(),
-      }),
+    // apiJson 不抛异常：断网时同样能复位 saving 并提示
+    const data = await apiJson("/api/events", "POST", {
+      eventTime,
+      natureId,
+      nameId: nameMode === "tag" ? nameId : null,
+      customName: nameMode === "other" ? customName.trim() : null,
+      mapId: mapId || null,
+      requiredCount: requiredNum,
+      format,
+      squadNatures,
+      opponent: opponent.trim(),
     });
-    const data = await res.json();
     setSaving(false);
     if (data.ok) {
       toast("赛事已创建", "success");
@@ -131,10 +129,7 @@ export default function NewEventPage() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <Link href="/admin/events" style={{ fontSize: 13, color: "var(--win-text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        返回赛事管理
-      </Link>
+      <div style={{ marginBottom: 12 }}><BackLink href="/admin/events" label="返回赛事管理" /></div>
 
       <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 24 }}>创建赛事</h1>
 

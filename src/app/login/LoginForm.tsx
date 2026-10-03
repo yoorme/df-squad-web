@@ -14,10 +14,23 @@ interface LoginFormProps {
   iconVersion: number;
 }
 
+// 校验登录后跳转地址：只允许本站相对路径。
+// callbackUrl 来自 URL 查询参数（可被任意构造），直接 router.push 会造成：
+//   · 开放重定向（?callbackUrl=https://evil.com 钓鱼）
+//   · javascript: 伪协议在应用源内执行脚本
+// 规则：必须以单个 "/" 开头（排除 "//evil.com" 协议相对地址与其它任何带 scheme 的串）
+function safeCallbackUrl(raw: string | null): string {
+  if (!raw) return "/";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
+  // 反斜杠会被部分浏览器当作路径分隔符（/\evil.com），一并拒绝
+  if (raw.startsWith("/\\")) return "/";
+  return raw;
+}
+
 export function LoginForm({ teamPrefix, iconVersion }: LoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"));
   const toast = useToast();
 
   const displayName = prefixDisplayName(teamPrefix);
@@ -57,98 +70,108 @@ export function LoginForm({ teamPrefix, iconVersion }: LoginFormProps) {
         alignItems: "center",
         justifyContent: "center",
         padding: 16,
+        // M3 表面 + 主色色调（surface 上的大色块，替代旧版渐变）
         background:
-          "linear-gradient(135deg, #0078d4 0%, #005a9e 50%, #003d6b 100%)",
+          "radial-gradient(1200px 600px at 50% -10%, var(--md-sys-color-primary-container) 0%, transparent 60%), var(--md-sys-color-surface)",
       }}
     >
       <div
-        className="win-card"
+        className="md-page-enter"
         style={{
           width: "100%",
-          maxWidth: 380,
+          maxWidth: 400,
           padding: 32,
-          backdropFilter: "blur(40px)",
-          background: "rgba(255, 255, 255, 0.95)",
+          background: "var(--md-sys-color-surface-container-low)",
+          borderRadius: "var(--md-sys-shape-corner-extra-large)",
+          boxShadow: "var(--md-sys-elevation-level2)",
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
           {/* 战队图标：始终显示管理后台配置的图标（自定义优先，无则默认）；
               v= 版本号在更换图标后变化，刷新页面即可绕过浏览器缓存 */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/favicon.ico?v=${iconVersion}`}
             alt="战队图标"
-            width={56}
-            height={56}
-            style={{ marginBottom: 12, borderRadius: 12, imageRendering: "pixelated" }}
+            width={64}
+            height={64}
+            style={{
+              marginBottom: 16,
+              borderRadius: 16,
+              imageRendering: "pixelated",
+              background: "var(--md-sys-color-surface-container-high)",
+              padding: 4,
+            }}
           />
-          <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>
+          <h1 className="md-typescale-title-large" style={{ fontWeight: 600, marginBottom: 4 }}>
             {displayName}战队报名系统
           </h1>
-          <p style={{ fontSize: 13, color: "var(--win-text-secondary)" }}>
+          <p className="md-typescale-body-small" style={{ color: "var(--md-sys-color-on-surface-variant)" }}>
             三角洲行动{displayName ? ` ${displayName} ` : ""}战队
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div>
-            <label className="win-label">昵称</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              {teamPrefix && (
-                <span
-                  className="win-input"
-                  style={{
-                    flexShrink: 0,
-                    width: "auto",
-                    borderRight: "none",
-                    borderTopRightRadius: 0,
-                    borderBottomRightRadius: 0,
-                    color: "var(--win-text-tertiary)",
-                    background: "var(--win-bg-hover)",
-                  }}
-                >
-                  {teamPrefix}
-                </span>
-              )}
+            <label className="win-label" htmlFor="login-username">
+              昵称
+            </label>
+            <div className="md-field-group">
+              {teamPrefix && <span className="md-field-prefix">{teamPrefix}</span>}
               <input
+                id="login-username"
                 className="win-input"
                 type="text"
                 placeholder="请输入昵称"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoFocus
-                style={{
-                  borderTopLeftRadius: teamPrefix ? 0 : undefined,
-                  borderBottomLeftRadius: teamPrefix ? 0 : undefined,
-                }}
+                autoComplete="username"
               />
             </div>
           </div>
           <div>
-            <label className="win-label">密码</label>
+            <label className="win-label" htmlFor="login-password">
+              密码
+            </label>
             <input
+              id="login-password"
               className="win-input"
               type="password"
               placeholder="请输入密码"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
             />
           </div>
           <button
             type="submit"
             className="win-btn win-btn-primary"
             disabled={loading}
-            style={{ marginTop: 8 }}
+            style={{ marginTop: 4, height: 48 }}
           >
+            {loading && <span className="win-spinner" style={{ width: 18, height: 18, borderWidth: 2 }} aria-hidden />}
             {loading ? "登录中..." : "登录"}
           </button>
         </form>
 
-        <div style={{ marginTop: 16, textAlign: "center", fontSize: 13, color: "var(--win-text-secondary)" }}>
+        <div
+          style={{
+            marginTop: 20,
+            textAlign: "center",
+            fontSize: 13,
+            color: "var(--md-sys-color-on-surface-variant)",
+          }}
+        >
           还没有账号？
           <Link
             href="/register"
-            style={{ color: "var(--win-accent)", marginLeft: 4, textDecoration: "none" }}
+            style={{
+              color: "var(--md-sys-color-primary)",
+              marginLeft: 4,
+              textDecoration: "none",
+              fontWeight: 500,
+            }}
           >
             凭邀请码注册
           </Link>

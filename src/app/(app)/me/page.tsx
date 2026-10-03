@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
-import { Loading } from "@/components/ui/StateView";
+import { Loading, ErrorState } from "@/components/ui/StateView";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { fetcher } from "@/lib/fetcher";
 
 interface Ability { id: string; name: string; category: "INFANTRY" | "VEHICLE"; sortOrder: number; }
 interface Duty { id: string; name: string; sortOrder: number; }
@@ -27,12 +30,13 @@ export default function MePage() {
   const confirm = useConfirm();
   const { update } = useSession();
 
-  const [info, setInfo] = useState<MyInfo | null>(null);
-  const [options, setOptions] = useState<{
+  const { data: info, error, mutate: reloadInfo } = useSWR<MyInfo>("/api/me", fetcher);
+  const { data: optionsData } = useSWR<{
     abilities: Ability[];
     duties: Duty[];
     operators: Operator[];
-  }>({ abilities: [], duties: [], operators: [] });
+  }>("/api/options", fetcher);
+  const options = optionsData ?? { abilities: [], duties: [], operators: [] };
 
   // 编辑状态
   const [editingNickname, setEditingNickname] = useState(false);
@@ -49,19 +53,6 @@ export default function MePage() {
   const [tempOperatorIds, setTempOperatorIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
-    const [meRes, optRes] = await Promise.all([
-      fetch("/api/me"),
-      fetch("/api/options"),
-    ]);
-    const meData = await meRes.json();
-    const optData = await optRes.json();
-    if (meData.ok) setInfo(meData.data);
-    if (optData.ok) setOptions(optData.data);
-  };
-
-  useEffect(() => { load(); }, []);
-
   const patch = async (payload: Record<string, unknown>) => {
     setLoading(true);
     try {
@@ -76,7 +67,7 @@ export default function MePage() {
         return false;
       }
       toast("保存成功", "success");
-      await load();
+      await reloadInfo();
       return true;
     } finally {
       setLoading(false);
@@ -110,6 +101,10 @@ export default function MePage() {
     }
     // 旧密码由服务端强制校验（防止会话被盗后绕过前端直接改密），失败会 toast 提示
     if (await patch({ password: newPwd, oldPassword: oldPwd })) {
+      // 改密会使 tokenVersion +1（其它设备/App 令牌立即失效）。
+      // 这里调用 update() 让服务端重读数据库、把当前会话的版本号同步为新值，
+      // 从而「其它设备下线、当前设备保持登录」，避免本人被立即登出
+      await update({});
       setEditingPassword(false);
       setOldPwd("");
       setNewPwd("");
@@ -148,6 +143,9 @@ export default function MePage() {
   };
 
   if (!info) {
+    if (error) {
+      return <ErrorState message={error.message || "加载失败"} onRetry={() => reloadInfo()} />;
+    }
     return <Loading />;
   }
 
@@ -160,12 +158,7 @@ export default function MePage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 760, margin: "0 auto" }}>
       {/* 标题 */}
-      <div>
-        <h1 style={{ fontSize: 24, fontWeight: 600 }}>我的</h1>
-        <p style={{ fontSize: 13, color: "var(--win-text-secondary)", marginTop: 4 }}>
-          管理你的个人信息
-        </p>
-      </div>
+      <PageHeader title="我的" description="管理你的个人信息" />
 
       {/* 账号信息卡片 */}
       <section className="win-card win-reveal" style={{ padding: 20 }}>
@@ -183,25 +176,18 @@ export default function MePage() {
             <span style={{ width: 80, fontSize: 13, color: "var(--win-text-secondary)" }}>昵称</span>
             {editingNickname ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                <div style={{ display: "flex", flex: 1, maxWidth: 320 }}>
-                  {!!info.teamPrefix && (
-                    <span
-                      className="win-input"
-                      style={{ width: "auto", borderRight: "none", borderRadius: "4px 0 0 4px", background: "var(--win-bg-hover)", color: "var(--win-text-tertiary)" }}
-                    >
-                      {info.teamPrefix}
-                    </span>
-                  )}
+                <div className="md-field-group" style={{ flex: 1, maxWidth: 320 }}>
+                  {!!info.teamPrefix && <span className="md-field-prefix">{info.teamPrefix}</span>}
                   <input
                     className="win-input"
-                    style={{ borderRadius: info.teamPrefix ? "0 4px 4px 0" : undefined }}
+                    aria-label="昵称"
                     value={tempNickname}
                     onChange={(e) => setTempNickname(e.target.value)}
                     autoFocus
                   />
                 </div>
-                <button className="win-btn win-btn-primary" onClick={handleSaveNickname} disabled={loading}>保存</button>
-                <button className="win-btn" onClick={() => setEditingNickname(false)}>取消</button>
+                <button className="win-btn win-btn-primary win-btn-sm" onClick={handleSaveNickname} disabled={loading}>保存</button>
+                <button className="win-btn win-btn-text win-btn-sm" onClick={() => setEditingNickname(false)}>取消</button>
               </div>
             ) : (
               <>

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth-server";
 import { ok, fail, ApiError, withErrorHandler } from "@/lib/api";
 import { getSiteSettings, buildUsername } from "@/lib/site-settings";
+import { rateLimit } from "@/lib/rate-limit";
 import bcrypt from "bcryptjs";
 
 // bcrypt 输入上限 72 字节，超长部分会被静默截断，直接拒绝更安全
@@ -86,6 +87,10 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const changingPassword = password !== undefined && password !== null && password !== "";
   if (changingPassword) {
     if (!oldPassword) throw new ApiError("请输入当前密码");
+    // 与 /api/me/verify-password 共用同一限流桶：
+    // 否则会话被盗后，攻击者可绕过该校验接口，直接在这里无限次爆破当前密码
+    const rl = rateLimit(`verify-pwd:${user.id}`, 5, 60_000);
+    if (!rl.success) throw new ApiError("尝试过于频繁，请稍后再试", 429);
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: { passwordHash: true },

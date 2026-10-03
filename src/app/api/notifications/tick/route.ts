@@ -107,16 +107,17 @@ async function runScan() {
     const [eventId, , minutesStr] = groupKey.split(":");
     const event = eventMap.get(eventId);
     if (!event) continue;
-    const okSent = await pushEventReminder(
+    const sentUsers = await pushEventReminder(
       eventId,
       event.title,
       Number(minutesStr),
       group.userIds
     );
-    // 发送成功才记日志（失败则下一轮重试，PushLog 唯一索引兜底防止重复提醒）
-    if (okSent) {
-      sent += group.userIds.length;
-      logsToWrite.push(...group.logs);
+    // 只给「实际送达的用户」记账（失败/无设备的用户下一轮会重试，
+    // PushLog 唯一索引兜底防止重复提醒）
+    if (sentUsers.size > 0) {
+      sent += sentUsers.size;
+      logsToWrite.push(...group.logs.filter((l) => sentUsers.has(l.userId)));
     }
   }
 

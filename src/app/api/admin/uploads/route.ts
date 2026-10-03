@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-server";
 import { ok, fail, withErrorHandler } from "@/lib/api";
 import { getUploadDir } from "@/lib/upload-dir";
+import { isErrno } from "@/lib/errors";
 import { readdir, unlink, stat } from "fs/promises";
 import path from "path";
 import { extractUploadPaths } from "@/lib/announcement-images";
@@ -23,7 +24,7 @@ function safeResolve(relUnderUploads: string): string | null {
 
 // 列出 uploads 目录全部图片文件（含 tmp 子目录）+ 标记是否被引用
 // GET /api/admin/uploads
-export const GET = withErrorHandler(async (req: NextRequest) => {
+export const GET = withErrorHandler(async () => {
   await requireAdmin();
 
   const uploadDir = path.resolve(getUploadDir());
@@ -33,16 +34,16 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   let topFiles: string[] = [];
   try {
     topFiles = await readdir(uploadDir);
-  } catch (e: any) {
-    if (e.code !== "ENOENT") throw e;
+  } catch (e: unknown) {
+    if (!isErrno(e, "ENOENT")) throw e;
   }
 
   // 读取 tmp 子目录
   let tmpFiles: string[] = [];
   try {
     tmpFiles = await readdir(path.join(uploadDir, "tmp"));
-  } catch (e: any) {
-    if (e.code !== "ENOENT") throw e;
+  } catch (e: unknown) {
+    if (!isErrno(e, "ENOENT")) throw e;
   }
 
   // 收集数据库中所有被引用的图片路径
@@ -105,7 +106,7 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const uploadDir = path.resolve(getUploadDir());
 
   // 收集数据库引用（mode=orphans 时用于判断保留）
-  let keepSet = new Set<string>();
+  const keepSet = new Set<string>();
   if (mode === "orphans") {
     const dbImages = await prisma.announcementImage.findMany({ select: { path: true } });
     for (const i of dbImages) keepSet.add(i.path);
@@ -124,8 +125,8 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
     let tmpFiles: string[] = [];
     try {
       tmpFiles = await readdir(path.join(uploadDir, "tmp"));
-    } catch (e: any) {
-      if (e.code !== "ENOENT") throw e;
+    } catch (e: unknown) {
+      if (!isErrno(e, "ENOENT")) throw e;
     }
     for (const name of tmpFiles) {
       if (!imgExt.includes(path.extname(name).toLowerCase())) continue;
@@ -140,8 +141,8 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
     let topFiles: string[] = [];
     try {
       topFiles = await readdir(uploadDir);
-    } catch (e: any) {
-      if (e.code !== "ENOENT") throw e;
+    } catch (e: unknown) {
+      if (!isErrno(e, "ENOENT")) throw e;
     }
     for (const name of topFiles) {
       if (!imgExt.includes(path.extname(name).toLowerCase())) continue;

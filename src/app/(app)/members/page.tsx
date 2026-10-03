@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { formatDateTime } from "@/lib/constants";
-import { Loading } from "@/components/ui/StateView";
+import { fetcher } from "@/lib/fetcher";
+import { SkeletonList, ErrorState, Empty } from "@/components/ui/StateView";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 interface Ability { id: string; name: string; category: "INFANTRY" | "VEHICLE"; }
 interface Duty { id: string; name: string; }
@@ -21,51 +24,46 @@ interface Member {
 }
 
 export default function MembersPage() {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState("");
 
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch("/api/members");
-    const data = await res.json();
-    if (data.ok) setMembers(data.data);
-    setLoading(false);
-  };
+  const {
+    data: members,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR<Member[]>("/api/members", fetcher);
 
-  useEffect(() => { load(); }, []);
-
+  const all = members ?? [];
   const filtered = keyword.trim()
-    ? members.filter((m) => m.nickname.toLowerCase().includes(keyword.trim().toLowerCase()))
-    : members;
+    ? all.filter((m) => m.nickname.toLowerCase().includes(keyword.trim().toLowerCase()))
+    : all;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 880, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 600 }}>队员</h1>
-          <p style={{ fontSize: 13, color: "var(--win-text-secondary)", marginTop: 4 }}>
-            共 {members.length} 位队员
-          </p>
-        </div>
-        <input
-          className="win-input"
-          type="text"
-          placeholder="搜索昵称"
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          style={{ width: 220, maxWidth: "100%" }}
-        />
-      </div>
+      <PageHeader
+        title="队员"
+        description={`共 ${all.length} 位队员`}
+        actions={
+          <input
+            className="win-input"
+            type="text"
+            placeholder="搜索昵称"
+            aria-label="搜索昵称"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            style={{ width: 220, maxWidth: "100%" }}
+          />
+        }
+      />
 
-      {loading ? (
-        <Loading />
+      {isLoading && !members ? (
+        <SkeletonList count={5} />
+      ) : error && !members ? (
+        <ErrorState message={error.message || "加载失败"} onRetry={() => mutate()} />
       ) : filtered.length === 0 ? (
-        <div className="win-card" style={{ padding: 40, textAlign: "center", color: "var(--win-text-tertiary)" }}>
-          {keyword.trim() ? "未找到匹配的队员" : "暂无队员"}
-        </div>
+        <Empty text={keyword.trim() ? "未找到匹配的队员" : "暂无队员"} />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="md-stagger" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {filtered.map((m) => {
             const infantry = m.abilities.filter((a) => a.category === "INFANTRY");
             const vehicle = m.abilities.filter((a) => a.category === "VEHICLE");
@@ -74,6 +72,7 @@ export default function MembersPage() {
                 key={m.id}
                 href={`/members/${m.id}`}
                 className="win-card win-reveal"
+                transitionTypes={["nav-forward"]}
                 style={{
                   padding: 20,
                   display: "block",

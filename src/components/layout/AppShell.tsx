@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode } from "react";
+import { ViewTransition, type ReactNode } from "react";
+import { NavLink } from "./NavLink";
 
 interface NavItem {
   href: string;
@@ -24,6 +25,15 @@ interface AppShellProps {
   teamDisplayName?: string;
 }
 
+// 移动端顶栏标题：按一级路由取栏目名（详情页沿用所属栏目）
+const SECTION_TITLES: Record<string, string> = {
+  announcements: "公告",
+  events: "赛事",
+  members: "队员",
+  me: "我的",
+  admin: "管理",
+};
+
 export function AppShell({ children, navItems, showAdmin, iconVersion, teamDisplayName }: AppShellProps) {
   const pathname = usePathname();
 
@@ -39,160 +49,112 @@ export function AppShell({ children, navItems, showAdmin, iconVersion, teamDispl
   };
 
   const items = showAdmin ? [...navItems, adminItem] : navItems;
-
-  const isActive = (href: string) =>
-    pathname === href || pathname?.startsWith(href + "/");
+  const sectionKey = pathname?.split("/")[1] ?? "";
+  const title = SECTION_TITLES[sectionKey] ?? "战队报名";
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "row" }}>
-      {/* 横屏/PC：左侧导航 */}
-      <aside
-        className="acrylic-strong"
-        style={{
-          display: "none",
-          flexDirection: "column",
-          width: 240,
-          flexShrink: 0,
-          padding: "16px 12px",
-          position: "sticky",
-          top: 0,
-          height: "100vh",
-          overflowY: "auto",
-          borderRight: "1px solid var(--win-border)",
-        }}
-        id="desktop-nav"
-      >
-        <div style={{ padding: "12px 12px 24px", display: "flex", alignItems: "center", gap: 8 }}>
-          {/* 战队图标：始终显示管理后台配置的图标（自定义优先，无则默认）；
-              v= 版本号在更换图标后变化，刷新页面即可绕过浏览器缓存 */}
+      {/* 桌面/横屏：M3 navigation rail（导航栏），活动项带胶囊指示器 */}
+      <aside className="acrylic-strong app-rail" aria-label="主导航">
+        <Link href="/announcements" className="app-rail-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/favicon.ico?v=${iconVersion ?? 0}`}
             alt="战队图标"
-            width={32}
-            height={32}
-            style={{ borderRadius: 6, imageRendering: "pixelated", flexShrink: 0 }}
+            width={36}
+            height={36}
+            style={{ borderRadius: 10, imageRendering: "pixelated", flexShrink: 0 }}
           />
-          <div>
-            {/* 品牌名跟随战队前缀（如 XX丨 → “XX战队报名”）；无前缀时仅显示“战队报名” */}
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--win-text)" }}>
-              {teamDisplayName ? `${teamDisplayName}战队报名` : "战队报名"}
-            </div>
-            <div style={{ fontSize: 11, color: "var(--win-text-tertiary)" }}>三角洲行动</div>
-          </div>
-        </div>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: "var(--md-sys-color-on-surface-variant)",
+              maxWidth: 76,
+              textAlign: "center",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {teamDisplayName || "战队"}
+          </span>
+        </Link>
 
-        <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%", alignItems: "center" }}>
           {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`win-nav-item ${isActive(item.href) ? "active" : ""}`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-              {!!item.badge && item.badge > 0 && (
-                <span className="win-badge-count" style={{ marginLeft: "auto" }}>
-                  {item.badge > 99 ? "99+" : item.badge}
-                </span>
-              )}
-            </Link>
+            <NavLink key={item.href} {...item} variant="rail" />
           ))}
         </nav>
       </aside>
 
-      {/* 主内容区 */}
-      <main
-        style={{
-          flex: 1,
-          minWidth: 0,
-          maxWidth: 1280,
-          margin: "0 auto",
-          width: "100%",
-          padding: "16px 16px 80px",
-        }}
-        id="main-content"
-      >
-        {children}
-      </main>
-
-      {/* 竖屏：底部导航 */}
-      <nav
-        className="acrylic-strong"
-        style={{
-          display: "none",
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 60,
-          borderTop: "1px solid var(--win-border)",
-          zIndex: 40,
-          justifyContent: "space-around",
-          alignItems: "center",
-        }}
-        id="mobile-nav"
-      >
-        {items.map((item) => {
-          const active = isActive(item.href);
-          return (
+      <div className="app-column">
+        {/* 移动端：M3 small top app bar（大标题由页面自身渲染） */}
+        <header className="acrylic-strong app-bar">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/favicon.ico?v=${iconVersion ?? 0}`}
+            alt=""
+            width={28}
+            height={28}
+            style={{ borderRadius: 8, imageRendering: "pixelated", flexShrink: 0 }}
+          />
+          <span
+            className="md-typescale-title-large"
+            style={{ fontWeight: 600, fontSize: 20, color: "var(--md-sys-color-on-surface)" }}
+          >
+            {title}
+          </span>
+          <span style={{ flex: 1 }} />
+          {showAdmin && (
             <Link
-              key={item.href}
-              href={item.href}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 2,
-                color: active ? "var(--win-accent)" : "var(--win-text-secondary)",
-                fontSize: 11,
-                padding: "6px 12px",
-                borderRadius: 6,
-                position: "relative",
-              }}
+              href="/admin"
+              className="md-icon-btn"
+              aria-label="管理后台"
+              transitionTypes={["nav-fade"]}
             >
-              <div style={{ position: "relative" }}>
-                {item.icon}
-                {!!item.badge && item.badge > 0 && (
-                  <span
-                    className="win-badge-count"
-                    style={{ position: "absolute", top: -6, right: -10 }}
-                  >
-                    {item.badge > 99 ? "99+" : item.badge}
-                  </span>
-                )}
-              </div>
-              <span>{item.label}</span>
+              {adminItem.icon}
             </Link>
-          );
-        })}
+          )}
+        </header>
+
+        {/* 主内容区：包一层 ViewTransition，实现 M3 页面转场
+            · nav-fade   —— 主导航切换：fade through（无位移，同级换内容）
+            · nav-forward —— 进入详情：shared axis X 前进入场
+            · nav-back    —— 返回列表：shared axis X 后退入场
+            · default: none —— 首次加载/无关更新不播动画 */}
+        <main className="app-main" id="main-content">
+          <ViewTransition
+            default="none"
+            enter={{
+              "nav-fade": "md-fade-through",
+              "nav-forward": "md-nav-forward",
+              "nav-back": "md-nav-back",
+              default: "none",
+            }}
+            exit={{
+              "nav-fade": "md-fade-through",
+              "nav-forward": "md-nav-forward",
+              "nav-back": "md-nav-back",
+              default: "none",
+            }}
+          >
+            {children}
+          </ViewTransition>
+        </main>
+      </div>
+
+      {/* 移动端：M3 navigation bar（底部导航条） */}
+      <nav className="acrylic-strong app-navbar" aria-label="主导航">
+        {items.map((item) => (
+          <NavLink key={item.href} {...item} variant="bar" />
+        ))}
       </nav>
 
-      {/* 队员入口：仅在公告页面显示，浮动在内容区左下角（导航栏右侧） */}
-      {pathname === "/announcements" && (
-        <Link
-          href="/members"
-          id="members-fab"
-          className="acrylic-strong"
-          style={{
-            position: "fixed",
-            bottom: 76,
-            left: 16,
-            zIndex: 30,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "8px 14px",
-            borderRadius: 999,
-            textDecoration: "none",
-            color: "var(--win-text-secondary)",
-            fontSize: 13,
-            fontWeight: 500,
-            border: "1px solid var(--win-border)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      {/* 队员入口：仅在公告页面显示；M3 extended FAB（桌面浮于导航栏右侧，移动端浮于内容上方） */}
+      {sectionKey === "announcements" && (
+        <Link href="/members" className="md-fab md-fab-extended md-fab-surface app-fab" transitionTypes={["nav-fade"]}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" strokeLinecap="round" strokeLinejoin="round" />
             <circle cx="9" cy="7" r="4" />
             <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" strokeLinecap="round" strokeLinejoin="round" />
@@ -200,18 +162,6 @@ export function AppShell({ children, navItems, showAdmin, iconVersion, teamDispl
           <span>队员</span>
         </Link>
       )}
-
-      {/* 响应式切换：>=768px 显示左侧栏，<768px 显示底部栏 */}
-      <style>{`
-        @media (min-width: 768px) {
-          #desktop-nav { display: flex !important; }
-          #main-content { padding-bottom: 16px !important; }
-          #members-fab { left: 256px !important; bottom: 16px !important; }
-        }
-        @media (max-width: 767px) {
-          #mobile-nav { display: flex !important; }
-        }
-      `}</style>
     </div>
   );
 }

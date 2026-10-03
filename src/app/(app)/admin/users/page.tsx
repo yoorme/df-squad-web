@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { BackLink } from "@/components/ui/BackLink";
 import { useSession } from "next-auth/react";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { Modal } from "@/components/ui/Modal";
 import { formatDateTime } from "@/lib/constants";
-import { Loading } from "@/components/ui/StateView";
+import { fetcher } from "@/lib/fetcher";
+import { apiFetch, apiJson } from "@/lib/client-api";
+import { SkeletonList, ErrorState } from "@/components/ui/StateView";
 
 interface UserItem {
   id: string;
@@ -25,20 +29,11 @@ export default function AdminUsersPage() {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const [users, setUsers] = useState<UserItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [resetTarget, setResetTarget] = useState<UserItem | null>(null);
   const [newPassword, setNewPassword] = useState("");
 
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch("/api/admin/users");
-    const data = await res.json();
-    if (data.ok) setUsers(data.data);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
+  const { data, error, isLoading, mutate } = useSWR<UserItem[]>("/api/admin/users", fetcher);
+  const users = data ?? [];
 
   const handleToggleRole = async (user: UserItem) => {
     const next = user.role === "ADMIN" ? "MEMBER" : "ADMIN";
@@ -48,15 +43,10 @@ export default function AdminUsersPage() {
       danger: next === "MEMBER",
     });
     if (!yes) return;
-    const res = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: user.id, role: next }),
-    });
-    const data = await res.json();
+    const data = await apiJson("/api/admin/users", "PATCH", { id: user.id, role: next });
     if (data.ok) {
       toast("已修改", "success");
-      load();
+      mutate();
     } else {
       toast(data.error || "操作失败", "error");
     }
@@ -70,15 +60,10 @@ export default function AdminUsersPage() {
       danger: next,
     });
     if (!yes) return;
-    const res = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: user.id, disabled: next }),
-    });
-    const data = await res.json();
+    const data = await apiJson("/api/admin/users", "PATCH", { id: user.id, disabled: next });
     if (data.ok) {
       toast("已修改", "success");
-      load();
+      mutate();
     } else {
       toast(data.error || "操作失败", "error");
     }
@@ -90,12 +75,10 @@ export default function AdminUsersPage() {
       toast("密码至少 6 位", "warning");
       return;
     }
-    const res = await fetch("/api/admin/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: resetTarget.id, password: newPassword }),
+    const data = await apiJson("/api/admin/users", "POST", {
+      id: resetTarget.id,
+      password: newPassword,
     });
-    const data = await res.json();
     if (data.ok) {
       toast("密码已重置", "success");
       setResetTarget(null);
@@ -117,12 +100,13 @@ export default function AdminUsersPage() {
     if (!yes) return;
     setDeletingId(user.id);
     try {
-      const res = await fetch(`/api/admin/users?id=${encodeURIComponent(user.id)}`, { method: "DELETE" });
-      const data = await res.json();
+      const data = await apiFetch<{
+        deleted: { username: string; registrations: number; announcements: number; events: number; invitationCodes: number };
+      }>(`/api/admin/users?id=${encodeURIComponent(user.id)}`, { method: "DELETE" });
       if (data.ok) {
         const d = data.data.deleted;
         toast(`已删除「${d.username}」（报名 ${d.registrations}｜公告 ${d.announcements}｜赛事 ${d.events}｜邀请码 ${d.invitationCodes}）`, "success");
-        load();
+        mutate();
       } else {
         toast(data.error || "删除失败", "error");
       }
@@ -133,18 +117,17 @@ export default function AdminUsersPage() {
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-      <Link href="/admin" style={{ fontSize: 13, color: "var(--win-text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        返回管理首页
-      </Link>
+      <div style={{ marginBottom: 12 }}><BackLink href="/admin" label="返回管理首页" /></div>
 
       <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 4 }}>用户管理</h1>
       <p style={{ fontSize: 13, color: "var(--win-text-secondary)", marginBottom: 24 }}>
         共 {users.length} 名队员
       </p>
 
-      {loading ? (
-        <Loading />
+      {isLoading && !data ? (
+        <SkeletonList count={4} />
+      ) : error && !data ? (
+        <ErrorState message={error.message || "加载失败"} onRetry={() => mutate()} />
       ) : (
         <div className="win-card" style={{ overflow: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>

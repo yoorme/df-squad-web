@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
-import { Loading, Empty } from "@/components/ui/StateView";
+import { SkeletonList, ErrorState, Empty } from "@/components/ui/StateView";
+import { BackLink } from "@/components/ui/BackLink";
 import { formatDateTime } from "@/lib/constants";
+import { fetcher } from "@/lib/fetcher";
+import { apiFetch, apiJson } from "@/lib/client-api";
 import { TagEditor } from "@/components/events/TagEditor";
 import { AssignView } from "@/components/events/AssignView";
 import type { EventSummary, EventManagePatch } from "@/types";
@@ -25,34 +29,18 @@ function toLocalInput(iso: string): string {
 export default function AdminEventsPage() {
   const toast = useToast();
   const confirm = useConfirm();
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch("/api/events?status=ALL");
-    const data = await res.json();
-    if (data.ok) setEvents(data.data);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error, isLoading, mutate } = useSWR<EventItem[]>("/api/events?status=ALL", fetcher);
+  const events = data ?? [];
 
   const handleArchiveToggle = async (ev: EventItem) => {
     const next = ev.status === "ARCHIVED" ? "UPCOMING" : "ARCHIVED";
-    const res = await fetch("/api/events/manage", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: ev.id, status: next }),
-    });
-    const data = await res.json();
+    const data = await apiJson("/api/events/manage", "PATCH", { id: ev.id, status: next });
     if (data.ok) {
       toast(ev.status === "ARCHIVED" ? "已恢复" : "已归档", "success");
-      load();
+      mutate();
     } else {
       toast(data.error || "操作失败", "error");
     }
@@ -66,11 +54,10 @@ export default function AdminEventsPage() {
       danger: true,
     });
     if (!yes) return;
-    const res = await fetch(`/api/events/manage?id=${ev.id}`, { method: "DELETE" });
-    const data = await res.json();
+    const data = await apiFetch(`/api/events/manage?id=${ev.id}`, { method: "DELETE" });
     if (data.ok) {
       toast("已删除", "success");
-      load();
+      mutate();
     } else {
       toast(data.error || "删除失败", "error");
     }
@@ -78,15 +65,10 @@ export default function AdminEventsPage() {
 
   // 保存赛事标签/赛制/分队性质/地图
   const handleSaveEdit = async (ev: EventItem, patch: EventManagePatch) => {
-    const res = await fetch("/api/events/manage", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: ev.id, ...patch }),
-    });
-    const data = await res.json();
+    const data = await apiJson("/api/events/manage", "PATCH", { id: ev.id, ...patch });
     if (data.ok) {
       toast("已保存", "success");
-      load();
+      mutate();
     } else {
       toast(data.error || "保存失败", "error");
     }
@@ -94,38 +76,26 @@ export default function AdminEventsPage() {
 
   return (
     <div style={{ maxWidth: 920, margin: "0 auto" }}>
-      <Link
-        href="/admin"
-        style={{
-          fontSize: 13,
-          color: "var(--win-text-secondary)",
-          textDecoration: "none",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          marginBottom: 12,
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        返回管理首页
-      </Link>
+      <div style={{ marginBottom: 12 }}>
+        <BackLink href="/admin" label="返回管理首页" />
+      </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 600 }}>赛事管理</h1>
-          <p style={{ fontSize: 13, color: "var(--win-text-secondary)", marginTop: 4 }}>
+          <h1 className="md-typescale-headline-small" style={{ fontWeight: 600 }}>赛事管理</h1>
+          <p className="md-typescale-body-small" style={{ color: "var(--md-sys-color-on-surface-variant)", marginTop: 4 }}>
             修改赛事标签、赛制与分队性质 · 标签可长按或右键编辑/删除
           </p>
         </div>
-        <Link href="/admin/events/new" className="win-btn win-btn-primary" style={{ fontSize: 13 }}>
-          + 创建赛事
+        <Link href="/admin/events/new" className="win-btn win-btn-primary" transitionTypes={["nav-forward"]}>
+          创建赛事
         </Link>
       </div>
 
-      {loading ? (
-        <Loading />
+      {isLoading && !data ? (
+        <SkeletonList count={3} />
+      ) : error && !data ? (
+        <ErrorState message={error.message || "加载失败"} onRetry={() => mutate()} />
       ) : events.length === 0 ? (
         <div className="win-card" style={{ overflow: "hidden" }}>
           <Empty text="暂无赛事" />
@@ -191,18 +161,28 @@ function EventEditCard({
   );
   // 赛事时间：datetime-local 输入控件兼容格式 YYYY-MM-DDTHH:mm
   const [eventTime, setEventTime] = useState(toLocalInput(ev.eventTime));
-  // 赛事名称标签列表（编辑时懒加载，供 tag 模式选择）
-  const [nameTags, setNameTags] = useState<{ id: string; name: string }[]>([]);
+  // 赛事名称标签列表（编辑时懒加载，供 tag 模式选择）；非编辑态 key 传 null，SWR 跳过请求
+  const { data: nameTagsData } = useSWR<{ id: string; name: string }[]>(
+    editing ? "/api/admin/tags?type=name" : null,
+    fetcher
+  );
+  const nameTags = nameTagsData ?? [];
 
-  useEffect(() => {
-    if (!editing) return;
-    fetch("/api/admin/tags?type=name")
-      .then((r) => r.json())
-      .then((d) => { if (d.ok) setNameTags(d.data); });
-  }, [editing]);
-
-  // 切换编辑对象时重置本地状态
-  useEffect(() => {
+  // 服务端数据变化时重置本地表单状态：渲染期比较后同步，避免 effect 中 setState 的级联渲染
+  //（React 官方「props 变化时调整 state」模式）；键沿用原 effect 的依赖项
+  const resetKey = [
+    ev.id,
+    ev.nature.id,
+    ev.name?.id ?? "",
+    ev.customName ?? "",
+    ev.opponent ?? "",
+    ev.map?.id ?? "",
+    ev.format ?? "",
+    ev.eventTime,
+  ].join("|");
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey);
     setNatureId(ev.nature.id);
     setNameMode(ev.name ? "tag" : ev.customName ? "other" : "unknown");
     setNameId(ev.name?.id ?? "");
@@ -212,7 +192,7 @@ function EventEditCard({
     setFormat(ev.format);
     setSquadNatures(Object.fromEntries(ev.squads.map((s) => [s.id, s.nature.id])));
     setEventTime(toLocalInput(ev.eventTime));
-  }, [ev.id, ev.nature.id, ev.name?.id, ev.customName, ev.opponent, ev.map?.id, ev.format, ev.eventTime]);
+  }
 
   const isArchived = ev.status === "ARCHIVED";
 

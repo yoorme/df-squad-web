@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
+import { BackLink } from "@/components/ui/BackLink";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
-import { Loading } from "@/components/ui/StateView";
+import { fetcher } from "@/lib/fetcher";
+import { apiFetch } from "@/lib/client-api";
+import { SkeletonList, ErrorState, Empty } from "@/components/ui/StateView";
 
 interface UploadFile {
   name: string;
@@ -23,23 +26,13 @@ function formatSize(bytes: number): string {
 export default function AdminUploadsPage() {
   const toast = useToast();
   const confirm = useConfirm();
-  const [files, setFiles] = useState<UploadFile[]>([]);
-  const [loading, setLoading] = useState(true);
   const [cleaning, setCleaning] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch("/api/admin/uploads");
-    const data = await res.json();
-    if (data.ok) {
-      setFiles(data.data.files);
-    } else {
-      toast(data.error || "加载失败", "error");
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
+  const { data, error, isLoading, mutate } = useSWR<{ files: UploadFile[] }>(
+    "/api/admin/uploads",
+    fetcher
+  );
+  const files = data?.files ?? [];
 
   const tmpFiles = files.filter((f) => f.tmp);
   const orphanFiles = files.filter((f) => !f.tmp && !f.referenced);
@@ -64,12 +57,14 @@ export default function AdminUploadsPage() {
     const yes = await confirm({ title: mode === "all" ? "删除全部正式图片（高危）" : "清理图片", message: msg, danger: true });
     if (!yes) return;
     setCleaning(true);
-    const res = await fetch(`/api/admin/uploads?mode=${mode}`, { method: "DELETE" });
-    const data = await res.json();
+    // apiFetch 不抛异常：断网时同样能复位 cleaning 并提示
+    const data = await apiFetch<{ deletedCount: number }>(`/api/admin/uploads?mode=${mode}`, {
+      method: "DELETE",
+    });
     setCleaning(false);
     if (data.ok) {
       toast(`已清理 ${data.data.deletedCount} 个文件`, "success");
-      load();
+      mutate();
     } else {
       toast(data.error || "清理失败", "error");
     }
@@ -83,11 +78,12 @@ export default function AdminUploadsPage() {
         : `确定删除未引用图片 ${file.name}？`;
     const yes = await confirm({ title: "删除图片", message: msg, danger: true });
     if (!yes) return;
-    const res = await fetch(`/api/upload?path=${encodeURIComponent(file.path)}`, { method: "DELETE" });
-    const data = await res.json();
+    const data = await apiFetch(`/api/upload?path=${encodeURIComponent(file.path)}`, {
+      method: "DELETE",
+    });
     if (data.ok) {
       toast("已删除", "success");
-      load();
+      mutate();
     } else {
       toast(data.error || "删除失败", "error");
     }
@@ -95,10 +91,7 @@ export default function AdminUploadsPage() {
 
   return (
     <div style={{ maxWidth: 880, margin: "0 auto" }}>
-      <Link href="/admin" style={{ fontSize: 13, color: "var(--win-text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        返回管理首页
-      </Link>
+      <div style={{ marginBottom: 12 }}><BackLink href="/admin" label="返回管理首页" /></div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
         <div>
@@ -132,12 +125,12 @@ export default function AdminUploadsPage() {
         </div>
       </div>
 
-      {loading ? (
-        <Loading />
+      {isLoading && !data ? (
+        <SkeletonList count={3} />
+      ) : error && !data ? (
+        <ErrorState message={error.message || "加载失败"} onRetry={() => mutate()} />
       ) : files.length === 0 ? (
-        <div className="win-card" style={{ padding: 40, textAlign: "center", color: "var(--win-text-tertiary)" }}>
-          暂无上传文件
-        </div>
+        <Empty text="暂无上传文件" />
       ) : (
         <div className="win-card" style={{ padding: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 12 }}>
@@ -155,6 +148,7 @@ export default function AdminUploadsPage() {
                   aspectRatio: "1",
                 }}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element -- 上传文件缩略图，尺寸不定 */}
                 <img src={file.path} alt={file.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 <div style={{
                   position: "absolute", bottom: 0, left: 0, right: 0,

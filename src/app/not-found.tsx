@@ -3,6 +3,7 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <div
+      className="md-page-enter"
       style={{
         minHeight: "100vh",
         display: "flex",
@@ -10,11 +11,23 @@ export default function NotFound() {
         alignItems: "center",
         justifyContent: "center",
         gap: 16,
-        color: "var(--win-text, #1b1b1b)",
+        padding: 24,
+        textAlign: "center",
+        background: "var(--md-sys-color-surface)",
+        color: "var(--md-sys-color-on-surface)",
       }}
     >
-      <div style={{ fontSize: 56, fontWeight: 700, opacity: 0.25 }}>404</div>
-      <p style={{ color: "var(--win-text-secondary, #5d5d5d)" }}>
+      <div
+        className="md-typescale-display-small"
+        style={{
+          fontWeight: 700,
+          color: "var(--md-sys-color-primary-container)",
+          WebkitTextStroke: "1px var(--md-sys-color-primary)",
+        }}
+      >
+        404
+      </div>
+      <p className="md-typescale-body-large" style={{ color: "var(--md-sys-color-on-surface-variant)" }}>
         页面不存在或已被移除
       </p>
       <Link href="/announcements" className="win-btn win-btn-primary">

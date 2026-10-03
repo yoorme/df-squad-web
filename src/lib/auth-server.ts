@@ -52,7 +52,9 @@ async function getUserFromBearerToken(): Promise<SessionUser | null> {
   }
 }
 
-// 实时从数据库校验账号状态（禁用/删除/令牌版本），保证注销与改密即时生效
+// 实时从数据库校验账号状态（禁用/删除/令牌版本），保证注销与改密即时生效。
+// tokenVersion 为 NaN 时表示该会话未携带版本号（本次改动前签发的旧会话）→ 跳过比对；
+// 携带版本号时，改密/重置密码（tokenVersion+1）会让旧 Web 会话与 App 令牌一并失效
 async function loadActiveUser(uid: string, tokenVersion = Number.NaN): Promise<SessionUser | null> {
   const dbUser = await prisma.user.findUnique({
     where: { id: uid },
@@ -72,14 +74,15 @@ async function loadActiveUser(uid: string, tokenVersion = Number.NaN): Promise<S
 
 // 获取当前登录用户（Web Cookie 会话或 App Bearer Token），
 // 并实时从数据库校验账号状态与角色。
-// 这样禁用/降级用户后，旧 JWT 也会立即失效。
+// 这样禁用/降级用户后，旧 JWT 也会立即失效；
+// 携带会话版本号时，改密/重置密码后旧 Web 会话同样立即失效。
 export async function getSessionUser(): Promise<SessionUser | null> {
   const bearerUser = await getUserFromBearerToken();
   if (bearerUser) return bearerUser;
 
   const session = await auth();
   if (!session?.user) return null;
-  return loadActiveUser(session.user.id);
+  return loadActiveUser(session.user.id, session.user.ver);
 }
 
 // 强制要求登录，否则抛错

@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { formatDateTime } from "@/lib/constants";
-import { Loading } from "@/components/ui/StateView";
+import { fetcher } from "@/lib/fetcher";
+import { SkeletonList, ErrorState, Empty } from "@/components/ui/StateView";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SegmentedFilter } from "@/components/ui/SegmentedFilter";
 
 interface Nature { id: string; name: string; }
 interface Name { id: string; name: string; }
@@ -35,61 +39,45 @@ interface EventListItem {
   myRegistration: { squadId: string | null; isSubstitute: boolean } | null;
 }
 
+type StatusFilter = "UPCOMING" | "ARCHIVED" | "ALL";
+
+const FILTERS = [
+  { value: "UPCOMING" as const, label: "即将进行" },
+  { value: "ARCHIVED" as const, label: "已结束" },
+  { value: "ALL" as const, label: "全部" },
+];
+
 export default function EventsPage() {
-  const [events, setEvents] = useState<EventListItem[]>([]);
-  const [filter, setFilter] = useState<"UPCOMING" | "ARCHIVED" | "ALL">("UPCOMING");
-  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<StatusFilter>("UPCOMING");
 
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch(`/api/events?status=${filter}`);
-    const data = await res.json();
-    if (data.ok) setEvents(data.data);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, [filter]);
+  // SWR：切换筛选保留上一份数据（keepPreviousData），切换不闪屏
+  const {
+    data: events,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR<EventListItem[]>(`/api/events?status=${filter}`, fetcher, {
+    keepPreviousData: true,
+    // 进行中的赛事临近开始/结束状态会变化，30 秒轮询一次保证列表新鲜
+    refreshInterval: filter === "ARCHIVED" ? 0 : 30000,
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 880, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 600 }}>赛事</h1>
-          <p style={{ fontSize: 13, color: "var(--win-text-secondary)", marginTop: 4 }}>
-            查看即将进行的赛事并报名
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 4, padding: 4, background: "var(--win-bg-hover)", borderRadius: 6 }}>
-          {(["UPCOMING", "ARCHIVED", "ALL"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 4,
-                border: "none",
-                background: filter === f ? "var(--win-bg-card-solid)" : "transparent",
-                color: filter === f ? "var(--win-accent)" : "var(--win-text-secondary)",
-                fontSize: 13,
-                cursor: "pointer",
-                fontWeight: filter === f ? 600 : 400,
-                boxShadow: filter === f ? "var(--win-shadow-card)" : "none",
-              }}
-            >
-              {f === "UPCOMING" ? "即将进行" : f === "ARCHIVED" ? "已结束" : "全部"}
-            </button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title="赛事"
+        description="查看即将进行的赛事并报名"
+        actions={<SegmentedFilter options={FILTERS} value={filter} onChange={setFilter} ariaLabel="赛事筛选" />}
+      />
 
-      {loading ? (
-        <Loading />
-      ) : events.length === 0 ? (
-        <div className="win-card" style={{ padding: 40, textAlign: "center", color: "var(--win-text-tertiary)" }}>
-          暂无赛事
-        </div>
+      {isLoading && !events ? (
+        <SkeletonList count={4} />
+      ) : error && !events ? (
+        <ErrorState message={error.message || "加载失败"} onRetry={() => mutate()} />
+      ) : !events || events.length === 0 ? (
+        <Empty text={filter === "ARCHIVED" ? "暂无已结束赛事" : "暂无赛事"} />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="md-stagger" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {events.map((e) => (
             <EventCard key={e.id} event={e} />
           ))}
@@ -111,6 +99,7 @@ function EventCard({ event }: { event: EventListItem }) {
     <Link
       href={`/events/${event.id}`}
       className="win-card win-reveal"
+      transitionTypes={["nav-forward"]}
       style={{
         padding: 20,
         display: "block",

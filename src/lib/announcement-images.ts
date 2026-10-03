@@ -3,6 +3,7 @@ import { getUploadDir } from "@/lib/upload-dir";
 import { rename, copyFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import { isErrno } from "@/lib/errors";
 
 // 从 markdown 文本中提取所有 /uploads/... 图片引用路径
 export function extractUploadPaths(markdown: string): Set<string> {
@@ -37,8 +38,8 @@ async function safeDeleteUpload(relPath: string): Promise<void> {
   if (!fullPath) return;
   try {
     await unlink(fullPath);
-  } catch (e: any) {
-    if (e.code !== "ENOENT") throw e;
+  } catch (e: unknown) {
+    if (!isErrno(e, "ENOENT")) throw e;
   }
 }
 
@@ -111,8 +112,8 @@ export async function processImagesOnSave(
         await rename(srcPath, dstPath);
         const newPath = `/uploads/${fileName}`;
         mapping.set(oldPath, newPath);
-      } catch (e: any) {
-        if (e.code === "ENOENT") {
+      } catch (e: unknown) {
+        if (isErrno(e, "ENOENT")) {
           // tmp 文件不存在（可能已被清理），标记为缺失，调用方移除引用
           missingPaths.add(oldPath);
           continue;
@@ -138,8 +139,8 @@ export async function processImagesOnSave(
         await copyFile(srcPath, dstPath);
         const newPath = `/uploads/${newFileName}`;
         mapping.set(oldPath, newPath);
-      } catch (e: any) {
-        if (e.code === "ENOENT") {
+      } catch (e: unknown) {
+        if (isErrno(e, "ENOENT")) {
           // 源文件不存在（已被删除），原引用本就 broken，标记缺失让调用方移除
           missingPaths.add(oldPath);
           continue;

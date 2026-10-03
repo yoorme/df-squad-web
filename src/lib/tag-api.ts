@@ -1,5 +1,6 @@
 // 标签管理 API 统一封装（/api/admin/tags）
 // admin/tags 管理页与 TagEditor 内联编辑器共用，消除重复的 fetch 样板
+import { apiFetch } from "@/lib/client-api";
 import type { TagType } from "@/types";
 
 interface TagApiResult<T = unknown> {
@@ -9,18 +10,17 @@ interface TagApiResult<T = unknown> {
 }
 
 async function post<T>(body: Record<string, unknown>): Promise<TagApiResult<T>> {
-  const res = await fetch("/api/admin/tags", {
+  // apiFetch 已把网络异常收敛为返回值，调用方无需 try/catch
+  return apiFetch<T>("/api/admin/tags", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return res.json();
 }
 
 export async function fetchTags<T = unknown>(type: TagType): Promise<T[]> {
-  const res = await fetch(`/api/admin/tags?type=${type}`);
-  const data = await res.json();
-  return data.ok ? data.data : [];
+  const res = await apiFetch<T[]>(`/api/admin/tags?type=${type}`);
+  return res.ok ? res.data : [];
 }
 
 export function createTag(

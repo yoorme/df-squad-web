@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import useSWR from "swr";
 import { Markdown } from "@/components/ui/Markdown";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { formatDateTime } from "@/lib/constants";
-import { Loading } from "@/components/ui/StateView";
+import { fetcher } from "@/lib/fetcher";
+import { apiFetch, apiJson } from "@/lib/client-api";
+import { SkeletonDetail, ErrorState } from "@/components/ui/StateView";
+import { BackLink } from "@/components/ui/BackLink";
 
 interface AnnouncementDetail {
   id: string;
@@ -36,25 +40,15 @@ export default function AnnouncementDetailPage() {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const [detail, setDetail] = useState<AnnouncementDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
 
   const isAdmin = session?.user?.role === "ADMIN";
 
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch(`/api/announcements?mode=detail&id=${params.id}`);
-    const data = await res.json();
-    if (data.ok) setDetail(data.data);
-    else toast(data.error || "加载失败", "error");
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (params.id) load();
-  }, [params.id]);
+  const { data: detail, error, isLoading, mutate: load } = useSWR<AnnouncementDetail>(
+    params.id ? `/api/announcements?mode=detail&id=${encodeURIComponent(params.id)}` : null,
+    fetcher
+  );
 
   // 归档/恢复（管理员）：归档后普通队员不可见
   const handleToggleArchive = async () => {
@@ -69,12 +63,7 @@ export default function AnnouncementDetailPage() {
       danger: next,
     });
     if (!yes) return;
-    const res = await fetch("/api/announcements", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: params.id, isArchived: next }),
-    });
-    const data = await res.json();
+    const data = await apiJson("/api/announcements", "PATCH", { id: params.id, isArchived: next });
     if (data.ok) {
       toast(next ? "已归档" : "已恢复", "success");
       load();
@@ -90,12 +79,10 @@ export default function AnnouncementDetailPage() {
       return;
     }
     setSubmittingComment(true);
-    const res = await fetch("/api/announcements/comments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ announcementId: params.id, content: commentText.trim() }),
+    const data = await apiJson("/api/announcements/comments", "POST", {
+      announcementId: params.id,
+      content: commentText.trim(),
     });
-    const data = await res.json();
     setSubmittingComment(false);
     if (data.ok) {
       setCommentText("");
@@ -114,8 +101,7 @@ export default function AnnouncementDetailPage() {
       danger: true,
     });
     if (!yes) return;
-    const res = await fetch(`/api/announcements/comments?id=${commentId}`, { method: "DELETE" });
-    const data = await res.json();
+    const data = await apiFetch(`/api/announcements/comments?id=${commentId}`, { method: "DELETE" });
     if (data.ok) {
       toast("已删除", "success");
       load();
@@ -132,8 +118,7 @@ export default function AnnouncementDetailPage() {
       danger: true,
     });
     if (!yes) return;
-    const res = await fetch(`/api/announcements?id=${params.id}`, { method: "DELETE" });
-    const data = await res.json();
+    const data = await apiFetch(`/api/announcements?id=${params.id}`, { method: "DELETE" });
     if (data.ok) {
       toast("已删除", "success");
       router.push("/announcements");
@@ -143,8 +128,11 @@ export default function AnnouncementDetailPage() {
     }
   };
 
-  if (loading) {
-    return <Loading />;
+  if (isLoading && !detail) {
+    return <SkeletonDetail />;
+  }
+  if (error && !detail) {
+    return <ErrorState message={error.message || "加载失败"} onRetry={() => load()} />;
   }
   if (!detail) {
     return <div className="win-card" style={{ padding: 40, textAlign: "center" }}>公告不存在</div>;
@@ -152,23 +140,7 @@ export default function AnnouncementDetailPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 880, margin: "0 auto" }}>
-      <Link
-        href="/announcements"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          fontSize: 13,
-          color: "var(--win-text-secondary)",
-          textDecoration: "none",
-          alignSelf: "flex-start",
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        返回公告列表
-      </Link>
+      <BackLink href="/announcements" label="返回公告列表" />
 
       {/* 公告主体 */}
       <article className="win-card" style={{ padding: 24 }}>

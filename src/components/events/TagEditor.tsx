@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
-import { fetchTags, createTag, updateTag, deleteTag } from "@/lib/tag-api";
+import { createTag, updateTag, deleteTag } from "@/lib/tag-api";
+import { fetcher } from "@/lib/fetcher";
 import type { TagItem } from "@/types";
 
 // 本组件仅用于赛事表单内的四类赛事标签选择
@@ -25,8 +27,10 @@ const TYPE_LABEL: Record<TagType, string> = {
 };
 
 export function TagEditor({ type, selectedId, onSelect }: Props) {
-  const [tags, setTags] = useState<TagItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: tags = [], isLoading: loading, mutate: load } = useSWR<TagItem[]>(
+    `/api/admin/tags?type=${type}`,
+    fetcher
+  );
   // 浮窗：编辑/删除某标签
   const [menu, setMenu] = useState<{ tag: TagItem; x: number; y: number } | null>(null);
   const [editName, setEditName] = useState("");
@@ -38,15 +42,12 @@ export function TagEditor({ type, selectedId, onSelect }: Props) {
   const confirm = useConfirm();
   const longPressTimer = useRef<number | null>(null);
 
-  const load = async () => {
-    setTags(await fetchTags<TagItem>(type));
-    setLoading(false);
-  };
-
+  // 组件卸载时清理长按定时器，避免对已卸载组件 setState
   useEffect(() => {
-    setLoading(true);
-    load();
-  }, [type]);
+    return () => {
+      if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    };
+  }, []);
 
   // 长按触发浮窗
   const startLongPress = (tag: TagItem, e: React.TouchEvent) => {
@@ -282,10 +283,10 @@ export function TagEditor({ type, selectedId, onSelect }: Props) {
             left: menu.x,
             top: menu.y,
             zIndex: 1000,
-            background: "var(--win-bg-card-solid)",
-            border: "1px solid var(--win-border-strong)",
-            borderRadius: 8,
-            boxShadow: "var(--win-shadow-flyout)",
+            background: "var(--md-sys-color-surface-container-high)",
+            border: "1px solid var(--md-sys-color-outline-variant)",
+            borderRadius: "var(--md-sys-shape-corner-extra-small)",
+            boxShadow: "var(--md-sys-elevation-level2)",
             padding: 12,
             display: "flex",
             flexDirection: "column",
@@ -308,18 +309,10 @@ export function TagEditor({ type, selectedId, onSelect }: Props) {
             autoFocus
           />
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button
-              className="win-btn win-btn-danger"
-              style={{ fontSize: 12, padding: "4px 12px", minHeight: 28 }}
-              onClick={handleDelete}
-            >
+            <button className="win-btn win-btn-sm win-btn-danger" onClick={handleDelete}>
               删除
             </button>
-            <button
-              className="win-btn win-btn-primary"
-              style={{ fontSize: 12, padding: "4px 12px", minHeight: 28 }}
-              onClick={handleSave}
-            >
+            <button className="win-btn win-btn-sm win-btn-primary" onClick={handleSave}>
               保存
             </button>
           </div>

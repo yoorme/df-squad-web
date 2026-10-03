@@ -5,6 +5,7 @@ import { ok, fail, withErrorHandler } from "@/lib/api";
 import { getSiteSettings, LEGACY_DEFAULT_PREFIX } from "@/lib/site-settings";
 import { normalizeTeamPrefix, PREFIX_SEPARATOR } from "@/lib/constants";
 import { getUploadDir } from "@/lib/upload-dir";
+import { isErrno } from "@/lib/errors";
 import { writeFile, mkdir, unlink, stat } from "fs/promises";
 import path from "path";
 
@@ -163,8 +164,8 @@ export const DELETE = withErrorHandler(async () => {
   // 删除物理文件（不存在时忽略）
   try {
     await unlink(path.join(path.resolve(getUploadDir()), TEAM_ICON_FILE));
-  } catch (e: any) {
-    if (e?.code !== "ENOENT") throw e;
+  } catch (e: unknown) {
+    if (!isErrno(e, "ENOENT")) throw e;
   }
   return ok({ success: true });
 });

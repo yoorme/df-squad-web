@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import useSWR from "swr";
 import {
   DndContext,
   PointerSensor,
@@ -12,6 +13,7 @@ import {
 } from "@dnd-kit/core";
 import { useToast } from "@/components/ui/Toast";
 import { formatDateTime } from "@/lib/constants";
+import { fetcher } from "@/lib/fetcher";
 
 interface Ability { id: string; name: string; category: string; }
 interface Duty { id: string; name: string; }
@@ -54,29 +56,31 @@ interface Props {
 export function AssignView({ eventId, onClose }: Props) {
   const toast = useToast();
   const [event, setEvent] = useState<EventDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // 服务器当前分布快照：registrationId → squadId（null = 替补池）
-  // load 时初始化，保存成功后同步更新；用于计算未保存的变更
-  const serverMapRef = useRef<Map<string, string | null> | null>(null);
+  // 服务器当前分布快照：registrationId → squadId（null = 替补池）。
+  // 用 state 而非 ref：待保存变更需要在渲染期读取它参与计算
+  const [serverMap, setServerMap] = useState<Map<string, string | null> | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch(`/api/events?id=${encodeURIComponent(eventId)}`);
-    const data = await res.json();
-    if (data.ok) {
-      setEvent(data.data);
-      serverMapRef.current = buildServerMap(data.data as EventDetail);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 数据源：SWR 拉取 + onSuccess 播种本地可编辑副本。
+  // 关闭聚焦/重连自动刷新，避免拖拽中的本地状态被服务端数据覆盖；
+  // 需要在保存失败时回滚 → 显式调用 load()（mutate）
+  const {
+    isLoading: loading,
+    error: loadError,
+    mutate: load,
+  } = useSWR<EventDetail>(`/api/events?id=${encodeURIComponent(eventId)}`, fetcher, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    onSuccess: (data) => {
+      setEvent(data);
+      setServerMap(buildServerMap(data));
+    },
+  });
 
   // 拖拽结束：仅更新本地状态（允许超容），保存由自动保存逻辑统一处理
   const handleDragEnd = (dragEvent: DragEndEvent) => {
@@ -127,7 +131,6 @@ export function AssignView({ eventId, onClose }: Props) {
   // 派生状态：超容分队列表 + 未保存的变更
   const overfullSquads = event?.squads.filter((s) => s.registeredCount > s.capacity) ?? [];
   const pendingMoves = (() => {
-    const serverMap = serverMapRef.current;
     if (!event || !serverMap) return [];
     const moves: { registrationId: string; targetSquadId: string | null }[] = [];
     for (const s of event.squads) {
@@ -145,8 +148,12 @@ export function AssignView({ eventId, onClose }: Props) {
     return moves;
   })();
 
-  // 自动保存：合规（无超容）且有变更时触发
+  // 自动保存：合规（无超容）且有变更时触发。
+  // saveNonce 在每次保存结束（无论成败）后 +1 并作为依赖：
+  // 保存进行中用户继续拖拽时本次 effect 会因 savingRef 提前返回，
+  // 若无 nonce，保存结束后不会再次触发，未保存的变更将被静默丢弃
   const savingRef = useRef(false);
+  const [saveNonce, setSaveNonce] = useState(0);
   useEffect(() => {
     if (!event || savingRef.current) return;
     if (overfullSquads.length > 0 || pendingMoves.length === 0) return;
@@ -163,9 +170,9 @@ export function AssignView({ eventId, onClose }: Props) {
         const data = await res.json();
         if (data.ok) {
           // 同步服务器快照
-          const map = serverMapRef.current ?? new Map();
+          const map = new Map(serverMap ?? []);
           for (const mv of pendingMoves) map.set(mv.registrationId, mv.targetSquadId);
-          serverMapRef.current = map;
+          setServerMap(map);
           if (data.data?.updated > 0) toast("已自动保存", "success");
         } else {
           toast(data.error || "保存失败，已回滚", "error");
@@ -177,16 +184,34 @@ export function AssignView({ eventId, onClose }: Props) {
       } finally {
         savingRef.current = false;
         setSaving(false);
+        // 唤醒 effect 再跑一次：保存期间产生的新拖拽会在这一次被提交
+        setSaveNonce((n) => n + 1);
       }
     };
     doSave();
-  }, [event]); // eslint-disable-line react-hooks/exhaustive-deps
+    // 依赖 event 与 saveNonce 即可：pendingMoves / overfullSquads 由 event 与
+    // serverMap 派生，而 serverMap 只在「保存成功」或「SWR 拉取成功（同时更新 event）」
+    // 时变化，两种情况都已由这两个依赖覆盖。把派生值放进依赖会导致保存后重复触发。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event, saveNonce]);
 
   if (loading) {
-    return <div style={{ textAlign: "center", padding: 40, color: "var(--win-text-tertiary)" }}>加载中...</div>;
+    return <div style={{ textAlign: "center", padding: 40, color: "var(--md-sys-color-on-surface-variant)" }}>加载中...</div>;
+  }
+  if (loadError && !event) {
+    return (
+      <div style={{ padding: 24, textAlign: "center" }}>
+        <div style={{ marginBottom: 12, color: "var(--md-sys-color-error)" }}>
+          {loadError.message || "加载失败"}
+        </div>
+        <button className="win-btn win-btn-secondary" onClick={() => load()}>
+          重试
+        </button>
+      </div>
+    );
   }
   if (!event) {
-    return <div style={{ padding: 24, textAlign: "center", color: "var(--win-text-tertiary)" }}>赛事不存在</div>;
+    return <div style={{ padding: 24, textAlign: "center", color: "var(--md-sys-color-on-surface-variant)" }}>赛事不存在</div>;
   }
 
   return (
@@ -202,7 +227,7 @@ export function AssignView({ eventId, onClose }: Props) {
             <span style={{ marginLeft: 8, color: "var(--win-warning)" }}>待保存 {pendingMoves.length} 项</span>
           )}
         </div>
-        <button className="win-btn" style={{ fontSize: 12, padding: "4px 12px", minHeight: 28 }} onClick={onClose}>
+        <button className="win-btn win-btn-sm" onClick={onClose}>
           关闭
         </button>
       </div>
@@ -211,12 +236,12 @@ export function AssignView({ eventId, onClose }: Props) {
       {overfullSquads.length > 0 && (
         <div
           style={{
-            padding: "10px 14px",
-            borderRadius: 8,
-            background: "rgba(247,147,30,0.08)",
-            border: "1px solid var(--win-warning)",
+            padding: "12px 16px",
+            borderRadius: "var(--md-sys-shape-corner-small)",
+            background: "var(--md-sys-color-warning-container)",
+            border: "1px solid var(--md-sys-color-warning)",
             fontSize: 13,
-            color: "var(--win-warning)",
+            color: "var(--md-sys-color-on-warning-container)",
           }}
         >
           ⚠ 超员未保存：{overfullSquads.map((s) => `第 ${s.index} 队 ${s.registeredCount}/${s.capacity}`).join("、")}
@@ -258,19 +283,39 @@ function SquadColumn({ squad }: { squad: Squad }) {
     <div
       ref={setNodeRef}
       style={{
-        background: isOver ? "var(--win-bg-selected)" : "var(--win-bg-hover)",
-        border: `2px dashed ${isOver ? "var(--win-accent)" : overfull ? "var(--win-warning)" : full ? "var(--win-danger)" : "var(--win-border)"}`,
-        borderRadius: 8,
+        background: isOver
+          ? "var(--md-sys-color-secondary-container)"
+          : "var(--md-sys-color-surface-container-low)",
+        border: `2px dashed ${
+          isOver
+            ? "var(--md-sys-color-primary)"
+            : overfull
+              ? "var(--md-sys-color-warning)"
+              : full
+                ? "var(--md-sys-color-error)"
+                : "var(--md-sys-color-outline-variant)"
+        }`,
+        borderRadius: "var(--md-sys-shape-corner-medium)",
         padding: 12,
         minHeight: 120,
-        transition: "background 0.15s, border-color 0.15s",
+        transition:
+          "background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard), border-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>
           第 {squad.index} 队 · {squad.nature.name}
         </span>
-        <span style={{ fontSize: 11, color: overfull ? "var(--win-warning)" : full ? "var(--win-danger)" : "var(--win-text-tertiary)" }}>
+        <span
+          style={{
+            fontSize: 11,
+            color: overfull
+              ? "var(--md-sys-color-warning)"
+              : full
+                ? "var(--md-sys-color-error)"
+                : "var(--md-sys-color-on-surface-variant)",
+          }}
+        >
           {squad.registeredCount}/{squad.capacity}
         </span>
       </div>
@@ -295,17 +340,22 @@ function SubstituteColumn({ substitutes }: { substitutes: Member[] }) {
     <div
       ref={setNodeRef}
       style={{
-        background: isOver ? "var(--win-bg-selected)" : "var(--win-bg-hover)",
-        border: `2px dashed ${isOver ? "var(--win-accent)" : "var(--win-border)"}`,
-        borderRadius: 8,
+        background: isOver
+          ? "var(--md-sys-color-secondary-container)"
+          : "var(--md-sys-color-surface-container-low)",
+        border: `2px dashed ${
+          isOver ? "var(--md-sys-color-primary)" : "var(--md-sys-color-outline-variant)"
+        }`,
+        borderRadius: "var(--md-sys-shape-corner-medium)",
         padding: 12,
         minHeight: 80,
-        transition: "background 0.15s, border-color 0.15s",
+        transition:
+          "background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard), border-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>替补池</span>
-        <span style={{ fontSize: 11, color: "var(--win-text-tertiary)" }}>{substitutes.length} 人</span>
+        <span style={{ fontSize: 11, color: "var(--md-sys-color-on-surface-variant)" }}>{substitutes.length} 人</span>
       </div>
       {substitutes.length === 0 ? (
         <div style={{ fontSize: 12, color: "var(--win-text-tertiary)", textAlign: "center", padding: 12 }}>
@@ -332,12 +382,15 @@ function MemberCard({ member }: { member: Member }) {
       {...attributes}
       {...listeners}
       style={{
-        background: "var(--win-bg-card-solid)",
-        border: "1px solid var(--win-border)",
-        borderRadius: 6,
-        padding: "6px 10px",
+        background: "var(--md-sys-color-surface-container-high)",
+        border: `1px solid ${
+          isDragging ? "var(--md-sys-color-primary)" : "var(--md-sys-color-outline-variant)"
+        }`,
+        borderRadius: "var(--md-sys-shape-corner-small)",
+        padding: "8px 12px",
         cursor: "grab",
-        opacity: isDragging ? 0.4 : 1,
+        opacity: isDragging ? 0.6 : 1,
+        boxShadow: isDragging ? "var(--md-sys-elevation-level2)" : "none",
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         touchAction: "none",
       }}

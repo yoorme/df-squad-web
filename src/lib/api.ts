@@ -29,16 +29,24 @@ const AUTH_ERRORS: Record<string, { message: string; status: number }> = {
   FORBIDDEN: { message: "无权限", status: 403 },
 };
 
+// Next 的 redirect() / notFound() 以「抛出带 digest 的特殊错误」实现控制流，
+// 必须原样向上抛。若被这里的 catch 吞掉，就会被错误地转成 500 JSON 响应。
+function isNextControlFlowError(e: unknown): boolean {
+  const digest = (e as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_");
+}
+
 // 包装 API 处理函数，统一处理权限错误与异常响应
 // 业务错误（ApiError / 历史字符串标记）原样返回；
 // 其余非预期异常只记服务端日志，对外一律返回"服务器错误"，避免内部实现细节外泄
-export function withErrorHandler<TArgs extends any[]>(
+export function withErrorHandler<TArgs extends unknown[]>(
   handler: (...args: TArgs) => Promise<Response>
 ) {
   return async (...args: TArgs): Promise<Response> => {
     try {
       return await handler(...args);
     } catch (e) {
+      if (isNextControlFlowError(e)) throw e;
       const msg = e instanceof Error ? e.message : String(e);
       const authError = AUTH_ERRORS[msg];
       if (authError) {

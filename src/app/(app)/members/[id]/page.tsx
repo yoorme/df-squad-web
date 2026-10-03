@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import useSWR from "swr";
 import { formatDateTime } from "@/lib/constants";
-import { Loading } from "@/components/ui/StateView";
+import { fetcher } from "@/lib/fetcher";
+import { SkeletonDetail, ErrorState } from "@/components/ui/StateView";
+import { BackLink } from "@/components/ui/BackLink";
 
 interface Ability { id: string; name: string; category: "INFANTRY" | "VEHICLE"; }
 interface Duty { id: string; name: string; }
@@ -23,26 +24,21 @@ interface MemberDetail {
 
 export default function MemberDetailPage() {
   const params = useParams<{ id: string }>();
-  const [member, setMember] = useState<MemberDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: member, error, isLoading, mutate } = useSWR<MemberDetail>(
+    params.id ? `/api/members/${encodeURIComponent(params.id)}` : null,
+    fetcher
+  );
 
-  useEffect(() => {
-    if (!params.id) return;
-    fetch(`/api/members/${params.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.ok) setMember(data.data);
-        setLoading(false);
-      });
-  }, [params.id]);
-
-  if (loading) {
-    return <Loading />;
+  if (isLoading && !member) {
+    return <SkeletonDetail />;
+  }
+  if (error && !member) {
+    return <ErrorState message={error.message || "加载失败"} onRetry={() => mutate()} />;
   }
   if (!member) {
     return (
-      <div style={{ maxWidth: 880, margin: "0 auto" }}>
-        <Link href="/members" style={backLinkStyle}>← 返回队员列表</Link>
+      <div style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+        <BackLink href="/members" label="返回队员列表" />
         <div className="win-card" style={{ padding: 40, textAlign: "center" }}>队员不存在</div>
       </div>
     );
@@ -53,17 +49,12 @@ export default function MemberDetailPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 880, margin: "0 auto" }}>
-      <Link href="/members" style={backLinkStyle}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        返回队员列表
-      </Link>
+      <BackLink href="/members" label="返回队员列表" />
 
       {/* 基本信息 */}
       <section className="win-card win-reveal" style={{ padding: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600 }}>{member.username}</h1>
+          <h1 className="md-typescale-title-large" style={{ fontSize: 22, fontWeight: 600 }}>{member.username}</h1>
           <span
             className="win-chip"
             style={member.role === "ADMIN" ? { background: "var(--win-bg-selected)", color: "var(--win-accent)", borderColor: "var(--win-accent)", fontSize: 11, padding: "2px 8px" } : { fontSize: 11, padding: "2px 8px" }}
@@ -138,12 +129,3 @@ export default function MemberDetailPage() {
   );
 }
 
-const backLinkStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-  fontSize: 13,
-  color: "var(--win-text-secondary)",
-  textDecoration: "none",
-  alignSelf: "flex-start",
-};

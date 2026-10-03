@@ -3,6 +3,9 @@
 
 type Bucket = {
   timestamps: number[];
+  // 每个 bucket 记录自己的窗口时长：清理时按各自窗口裁剪，
+  // 避免用「本次调用的窗口」误删其它更长窗口桶内的有效计数
+  windowMs: number;
 };
 
 const buckets = new Map<string, Bucket>();
@@ -11,12 +14,12 @@ const buckets = new Map<string, Bucket>();
 const CLEANUP_INTERVAL = 10 * 60 * 1000;
 let lastCleanup = Date.now();
 
-function cleanup(windowMs: number) {
+function cleanup() {
   const now = Date.now();
   if (now - lastCleanup < CLEANUP_INTERVAL) return;
   lastCleanup = now;
   for (const [key, bucket] of buckets) {
-    bucket.timestamps = bucket.timestamps.filter((t) => now - t < windowMs);
+    bucket.timestamps = bucket.timestamps.filter((t) => now - t < bucket.windowMs);
     if (bucket.timestamps.length === 0) buckets.delete(key);
   }
 }
@@ -36,9 +39,10 @@ export function rateLimit(
   limit: number,
   windowMs: number
 ): RateLimitResult {
-  cleanup(windowMs);
+  cleanup();
   const now = Date.now();
-  const bucket = buckets.get(key) ?? { timestamps: [] };
+  const bucket = buckets.get(key) ?? { timestamps: [], windowMs };
+  bucket.windowMs = windowMs;
   bucket.timestamps = bucket.timestamps.filter((t) => now - t < windowMs);
 
   if (bucket.timestamps.length >= limit) {

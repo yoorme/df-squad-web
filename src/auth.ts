@@ -39,6 +39,7 @@ export const authConfig: NextAuthConfig = {
           email: null,
           role: verified.role,
           nickname: verified.nickname,
+          tokenVersion: verified.tokenVersion,
         };
       },
     }),
@@ -49,6 +50,8 @@ export const authConfig: NextAuthConfig = {
         token.id = user.id;
         token.role = user.role;
         token.nickname = user.nickname;
+        // 记录签发时的令牌版本：改密/重置密码会 +1，服务端据此让旧会话立即失效
+        token.ver = user.tokenVersion;
       }
       // 前端调用 update() 时（如修改昵称/资料后），不信任客户端传入的
       // session 数据，统一从数据库重读，防止伪造 token 中的身份信息，
@@ -61,6 +64,7 @@ export const authConfig: NextAuthConfig = {
           token.name = dbUser.username;
           token.nickname = dbUser.nickname;
           token.role = dbUser.role;
+          token.ver = dbUser.tokenVersion;
         }
       }
       return token;
@@ -70,6 +74,7 @@ export const authConfig: NextAuthConfig = {
         session.user.id = token.id as string;
         session.user.role = token.role as Role;
         session.user.nickname = token.nickname as string;
+        session.user.ver = token.ver as number | undefined;
         session.user.name = token.name ?? session.user.name;
       }
       return session;

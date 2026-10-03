@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { formatDateTime } from "@/lib/constants";
-import { Loading } from "@/components/ui/StateView";
+import { fetcher } from "@/lib/fetcher";
+import { apiFetch, apiJson } from "@/lib/client-api";
+import { SkeletonList, ErrorState, Empty } from "@/components/ui/StateView";
+import { SegmentedFilter } from "@/components/ui/SegmentedFilter";
 
 interface AnnouncementItem {
   id: string;
@@ -17,25 +21,28 @@ interface AnnouncementItem {
   commentCount: number;
 }
 
+type StatusFilter = "normal" | "archived" | "all";
+
+const FILTERS = [
+  { value: "all" as const, label: "全部" },
+  { value: "normal" as const, label: "正常" },
+  { value: "archived" as const, label: "已归档" },
+];
+
 // 公告管理：全部/正常/已归档 tab 切换，支持归档/恢复/编辑/删除
 // 已归档公告仅在此处（及公告列表的管理员视图）可见
 export default function AdminAnnouncementsPage() {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const [items, setItems] = useState<AnnouncementItem[]>([]);
-  const [filter, setFilter] = useState<"normal" | "archived" | "all">("all");
-  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<StatusFilter>("all");
 
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch(`/api/admin/announcements?status=${filter}`);
-    const data = await res.json();
-    if (data.ok) setItems(data.data.announcements);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, [filter]);
+  const { data, error, isLoading, mutate } = useSWR<{ announcements: AnnouncementItem[] }>(
+    `/api/admin/announcements?status=${filter}`,
+    fetcher,
+    { keepPreviousData: true }
+  );
+  const items = data?.announcements ?? [];
 
   // 归档/恢复
   const handleToggleArchive = async (item: AnnouncementItem) => {
@@ -49,17 +56,12 @@ export default function AdminAnnouncementsPage() {
       danger: next,
     });
     if (!yes) return;
-    const res = await fetch("/api/announcements", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: item.id, isArchived: next }),
-    });
-    const data = await res.json();
-    if (data.ok) {
+    const result = await apiJson("/api/announcements", "PATCH", { id: item.id, isArchived: next });
+    if (result.ok) {
       toast(next ? "已归档" : "已恢复", "success");
-      load();
+      mutate();
     } else {
-      toast(data.error || "操作失败", "error");
+      toast(result.error || "操作失败", "error");
     }
   };
 
@@ -70,58 +72,39 @@ export default function AdminAnnouncementsPage() {
       danger: true,
     });
     if (!yes) return;
-    const res = await fetch(`/api/announcements?id=${item.id}`, { method: "DELETE" });
-    const data = await res.json();
-    if (data.ok) {
+    const result = await apiFetch(`/api/announcements?id=${item.id}`, { method: "DELETE" });
+    if (result.ok) {
       toast("已删除", "success");
-      load();
+      mutate();
     } else {
-      toast(data.error || "删除失败", "error");
+      toast(result.error || "删除失败", "error");
     }
   };
 
   return (
-    <div style={{ maxWidth: 880, margin: "0 auto" }}>
-      <Link href="/admin" style={{ fontSize: 13, color: "var(--win-text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        返回管理首页
+    <div style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+      <Link href="/admin" transitionTypes={["nav-back"]} className="md-back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        <span>返回管理首页</span>
       </Link>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 4 }}>公告管理</h1>
-          <p style={{ fontSize: 13, color: "var(--win-text-secondary)" }}>共 {items.length} 条公告 · 已归档的公告仅管理员可见</p>
+          <h1 className="md-typescale-headline-small" style={{ fontWeight: 600, marginBottom: 4 }}>公告管理</h1>
+          <p className="md-typescale-body-small" style={{ color: "var(--md-sys-color-on-surface-variant)" }}>共 {items.length} 条公告 · 已归档的公告仅管理员可见</p>
         </div>
-        <Link href="/admin/announcements/new" className="win-btn win-btn-primary">+ 发布公告</Link>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <SegmentedFilter options={FILTERS} value={filter} onChange={setFilter} ariaLabel="公告状态筛选" />
+          <Link href="/admin/announcements/new" className="win-btn win-btn-primary">发布公告</Link>
+        </div>
       </div>
 
-      {/* 状态切换：全部 / 正常 / 已归档 */}
-      <div style={{ display: "flex", gap: 4, padding: 4, background: "var(--win-bg-hover)", borderRadius: 6, marginBottom: 16, width: "fit-content" }}>
-        {(["all", "normal", "archived"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            style={{
-              padding: "6px 12px",
-              borderRadius: 4,
-              border: "none",
-              background: filter === f ? "var(--win-bg-card-solid)" : "transparent",
-              color: filter === f ? "var(--win-accent)" : "var(--win-text-secondary)",
-              fontSize: 13,
-              cursor: "pointer",
-              fontWeight: filter === f ? 600 : 400,
-              boxShadow: filter === f ? "var(--win-shadow-card)" : "none",
-            }}
-          >
-            {f === "all" ? "全部" : f === "normal" ? "正常" : "已归档"}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <Loading />
+      {isLoading && !data ? (
+        <SkeletonList count={4} />
+      ) : error && !data ? (
+        <ErrorState message={error.message || "加载失败"} onRetry={() => mutate()} />
       ) : items.length === 0 ? (
-        <div className="win-card" style={{ padding: 40, textAlign: "center", color: "var(--win-text-tertiary)" }}>暂无公告</div>
+        <Empty text="暂无公告" />
       ) : (
         <div className="win-card" style={{ overflow: "hidden" }}>
           {items.map((item, idx) => (
@@ -159,17 +142,13 @@ export default function AdminAnnouncementsPage() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <Link href={`/admin/announcements/${item.id}/edit`} className="win-btn" style={{ fontSize: 12, padding: "4px 10px", minHeight: 28, textDecoration: "none" }}>
+                <Link href={`/admin/announcements/${item.id}/edit`} className="win-btn win-btn-sm" style={{ textDecoration: "none" }}>
                   编辑
                 </Link>
-                <button
-                  className="win-btn"
-                  style={{ fontSize: 12, padding: "4px 10px", minHeight: 28 }}
-                  onClick={() => handleToggleArchive(item)}
-                >
+                <button className="win-btn win-btn-sm" onClick={() => handleToggleArchive(item)}>
                   {item.isArchived ? "恢复" : "归档"}
                 </button>
-                <button className="win-btn" style={{ fontSize: 12, padding: "4px 10px", minHeight: 28, color: "var(--win-danger)" }} onClick={() => handleDelete(item)}>
+                <button className="win-btn win-btn-sm win-btn-text" style={{ color: "var(--md-sys-color-error)" }} onClick={() => handleDelete(item)}>
                   删除
                 </button>
               </div>

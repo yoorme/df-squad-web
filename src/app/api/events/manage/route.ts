@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-server";
 import { ok, fail, withErrorHandler } from "@/lib/api";
@@ -115,11 +116,25 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
 
   await prisma.$transaction(async (tx) => {
     // 更新赛事主字段
-    const evData: any = {};
+    // Unchecked 变体允许直接写外键标量（natureId/nameId/mapId），与既有逻辑一致
+    const evData: Prisma.EventUncheckedUpdateInput = {};
     if (status) evData.status = status;
     if (natureId) evData.natureId = natureId;
-    if (nameId !== undefined) evData.nameId = nameId || null; // null = 清空名称
-    if (customName !== undefined) evData.customName = customName ? customName.trim() : null;
+    // nameId 与 customName 是同一展示位的两个来源，必须成对维护：
+    //   · 关联标签 → 清掉自定义名（否则之后取消标签时旧名会"复活"）
+    //   · 清空标签 → 保留显式传入的自定义名，未传则一并清空
+    //     （否则仅传 { nameId: null } 时旧 customName 残留在库里，
+    //      下次编辑对手等字段时会重新出现在标题中）
+    if (nameId) {
+      evData.nameId = nameId;
+      evData.customName = null;
+    } else if (nameId === null) {
+      evData.nameId = null;
+      evData.customName = null;
+    }
+    if (customName !== undefined && !nameId) {
+      evData.customName = customName ? customName.trim() : null;
+    }
     if (mapId !== undefined) evData.mapId = mapId; // null = 清空，string = 切换
     if (opponent !== undefined) evData.opponent = opponent ? opponent.trim() : null;
     if (format !== undefined) evData.format = format;

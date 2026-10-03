@@ -9,6 +9,8 @@ export interface VerifiedUser {
   username: string;
   nickname: string;
   role: "ADMIN" | "MEMBER";
+  // 令牌版本：写入会话 JWT，用于改密/重置密码后让旧会话立即失效
+  tokenVersion: number;
 }
 
 export async function verifyCredentials(
@@ -40,5 +42,6 @@ export async function verifyCredentials(
     username: user.username,
     nickname: user.nickname,
     role: user.role,
+    tokenVersion: user.tokenVersion,
   };
 }

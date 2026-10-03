@@ -1,324 +1,969 @@
 @import "tailwindcss";
 
-/* ============ Windows 11 Fluent Design 主题变量 ============ */
+/* ============================================================================
+   Material Design 3 设计系统（M3 规范：色彩角色 / 字阶 / 形状 / 高度 / 动效）
+   ----------------------------------------------------------------------------
+   · 色彩：以蓝色为种子的 M3 色调板（tone 0-100）映射为语义色彩角色
+     （primary / secondary / tertiary / error / surface* / outline / inverse）
+   · 形状：none 0 · xs 4 · sm 8 · md 12 · lg 16 · xl 28 · full 9999
+   · 高度：level 0-5（叠加色调 + 阴影）
+   · 动效：emphasized / standard 缓动曲线 + M3 时长令牌
+   · 深色模式：跟随系统 prefers-color-scheme
+   · 兼容层：原有 --win-* 变量与 win-* 类名保留为别名，语义直接指向 M3 令牌，
+     存量页面无需改动即可获得 M3 外观；新代码请直接使用 --md-sys-* 令牌
+   ============================================================================ */
+
+/* ============ 1. 设计令牌 ============ */
 :root {
-  /* 主色 - Windows 11 Accent Blue */
-  --win-accent: #0078d4;
-  --win-accent-hover: #106ebe;
-  --win-accent-pressed: #005a9e;
-  --win-accent-light: #4cc2ff;
+  color-scheme: light;
 
-  /* 背景 */
-  --win-bg: #f3f3f3;
-  --win-bg-card: rgba(255, 255, 255, 0.7);
-  --win-bg-card-solid: #ffffff;
-  --win-bg-sidebar: rgba(252, 252, 252, 0.85);
-  --win-bg-hover: rgba(0, 0, 0, 0.04);
-  --win-bg-pressed: rgba(0, 0, 0, 0.08);
-  --win-bg-selected: rgba(0, 120, 212, 0.1);
+  /* ---- 色彩角色（浅色） ---- */
+  --md-sys-color-primary: #0b6bcb;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #d3e4ff;
+  --md-sys-color-on-primary-container: #001c38;
+  --md-sys-color-secondary: #3f5f90;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #d6e3ff;
+  --md-sys-color-on-secondary-container: #001b3d;
+  --md-sys-color-tertiary: #00696e;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #9cf0f6;
+  --md-sys-color-on-tertiary-container: #002022;
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #410002;
+  --md-sys-color-success: #146c2e;
+  --md-sys-color-on-success: #ffffff;
+  --md-sys-color-success-container: #a8f5b8;
+  --md-sys-color-on-success-container: #002106;
+  --md-sys-color-warning: #7a5900;
+  --md-sys-color-warning-container: #ffdf9e;
+  --md-sys-color-on-warning-container: #261a00;
 
-  /* 边框 */
-  --win-border: rgba(0, 0, 0, 0.08);
-  --win-border-strong: rgba(0, 0, 0, 0.15);
-  --win-card-stroke: rgba(255, 255, 255, 0.6);
+  /* 表面：M3 用 5 级 surface container 表达层级，而非纯阴影 */
+  --md-sys-color-surface: #f8f9ff;
+  --md-sys-color-surface-dim: #d8dae0;
+  --md-sys-color-surface-bright: #f8f9ff;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f2f3fa;
+  --md-sys-color-surface-container: #eceef4;
+  --md-sys-color-surface-container-high: #e6e8ee;
+  --md-sys-color-surface-container-highest: #e1e2e9;
+  --md-sys-color-on-surface: #191c20;
+  --md-sys-color-on-surface-variant: #43474e;
+  --md-sys-color-outline: #73777f;
+  --md-sys-color-outline-variant: #c3c6cf;
+  --md-sys-color-inverse-surface: #2e3135;
+  --md-sys-color-inverse-on-surface: #eff0f4;
+  --md-sys-color-inverse-primary: #a8c7fa;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
 
-  /* 文本 */
-  --win-text: #1a1a1a;
-  --win-text-secondary: #5f5f5f;
-  --win-text-tertiary: #8a8a8a;
-  --win-text-on-accent: #ffffff;
+  /* ---- 形状 ---- */
+  --md-sys-shape-corner-none: 0px;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
 
-  /* 状态 */
-  --win-success: #107c10;
-  --win-warning: #ffb900;
-  --win-danger: #d13438;
-  --win-danger-hover: #c50f1f;
+  /* ---- 高度层级（阴影） ---- */
+  --md-sys-elevation-level0: none;
+  --md-sys-elevation-level1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --md-sys-elevation-level2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --md-sys-elevation-level3: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+  --md-sys-elevation-level4: 0 2px 3px rgba(0, 0, 0, 0.3), 0 6px 10px 4px rgba(0, 0, 0, 0.15);
+  --md-sys-elevation-level5: 0 4px 4px rgba(0, 0, 0, 0.3), 0 8px 12px 6px rgba(0, 0, 0, 0.15);
 
-  /* 阴影 */
-  --win-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.08);
-  --win-shadow-flyout: 0 8px 32px rgba(0, 0, 0, 0.14), 0 0 1px rgba(0, 0, 0, 0.08);
+  /* ---- 动效：缓动曲线与时长 ---- */
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-standard-decelerate: cubic-bezier(0, 0, 0, 1);
+  --md-sys-motion-easing-standard-accelerate: cubic-bezier(0.3, 0, 1, 1);
+  --md-sys-motion-duration-short1: 50ms;
+  --md-sys-motion-duration-short2: 100ms;
+  --md-sys-motion-duration-short3: 150ms;
+  --md-sys-motion-duration-short4: 200ms;
+  --md-sys-motion-duration-medium1: 250ms;
+  --md-sys-motion-duration-medium2: 300ms;
+  --md-sys-motion-duration-medium3: 350ms;
+  --md-sys-motion-duration-medium4: 400ms;
+  --md-sys-motion-duration-long1: 450ms;
+  --md-sys-motion-duration-long2: 500ms;
+  --md-sys-motion-duration-extra-long1: 700ms;
 
-  /* 圆角 */
-  --win-radius-sm: 4px;
-  --win-radius: 8px;
-  --win-radius-lg: 12px;
+  /* ---- 状态层不透明度（M3 state layer） ---- */
+  --md-sys-state-hover-opacity: 0.08;
+  --md-sys-state-focus-opacity: 0.1;
+  --md-sys-state-pressed-opacity: 0.1;
+  --md-sys-state-dragged-opacity: 0.16;
 
-  /* 间距 */
+  /* ======== 兼容别名：旧 --win-* → M3 语义 ======== */
+  --win-accent: var(--md-sys-color-primary);
+  --win-accent-hover: color-mix(in srgb, var(--md-sys-color-primary) 92%, var(--md-sys-color-on-primary));
+  --win-accent-pressed: color-mix(in srgb, var(--md-sys-color-primary) 84%, var(--md-sys-color-on-primary));
+  --win-accent-light: var(--md-sys-color-inverse-primary);
+
+  --win-bg: var(--md-sys-color-surface);
+  --win-bg-card: color-mix(in srgb, var(--md-sys-color-surface-container-low) 86%, transparent);
+  --win-bg-card-solid: var(--md-sys-color-surface-container-low);
+  --win-bg-sidebar: color-mix(in srgb, var(--md-sys-color-surface-container) 88%, transparent);
+  --win-bg-hover: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  --win-bg-pressed: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+  --win-bg-selected: var(--md-sys-color-secondary-container);
+
+  --win-border: var(--md-sys-color-outline-variant);
+  --win-border-strong: var(--md-sys-color-outline);
+  --win-card-stroke: color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent);
+
+  --win-text: var(--md-sys-color-on-surface);
+  --win-text-secondary: var(--md-sys-color-on-surface-variant);
+  --win-text-tertiary: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 72%, transparent);
+  --win-text-on-accent: var(--md-sys-color-on-primary);
+
+  --win-success: var(--md-sys-color-success);
+  --win-warning: var(--md-sys-color-warning);
+  --win-danger: var(--md-sys-color-error);
+  --win-danger-hover: color-mix(in srgb, var(--md-sys-color-error) 88%, var(--md-sys-color-on-error));
+
+  --win-shadow-card: var(--md-sys-elevation-level1);
+  --win-shadow-flyout: var(--md-sys-elevation-level3);
+
+  --win-radius-sm: var(--md-sys-shape-corner-extra-small);
+  --win-radius: var(--md-sys-shape-corner-medium);
+  --win-radius-lg: var(--md-sys-shape-corner-extra-large);
   --win-gap: 16px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --win-accent: #4cc2ff;
-    --win-accent-hover: #6fc7ff;
-    --win-accent-pressed: #38b6ff;
+    color-scheme: dark;
 
-    --win-bg: #202020;
-    --win-bg-card: rgba(44, 44, 44, 0.7);
-    --win-bg-card-solid: #2c2c2c;
-    --win-bg-sidebar: rgba(32, 32, 32, 0.85);
-    --win-bg-hover: rgba(255, 255, 255, 0.06);
-    --win-bg-pressed: rgba(255, 255, 255, 0.1);
-    --win-bg-selected: rgba(76, 194, 255, 0.15);
+    --md-sys-color-primary: #a8c7fa;
+    --md-sys-color-on-primary: #00315f;
+    --md-sys-color-primary-container: #0842a0;
+    --md-sys-color-on-primary-container: #d3e4ff;
+    --md-sys-color-secondary: #aec6ff;
+    --md-sys-color-on-secondary: #0a305f;
+    --md-sys-color-secondary-container: #26477a;
+    --md-sys-color-on-secondary-container: #d6e3ff;
+    --md-sys-color-tertiary: #80d4da;
+    --md-sys-color-on-tertiary: #003639;
+    --md-sys-color-tertiary-container: #004f53;
+    --md-sys-color-on-tertiary-container: #9cf0f6;
+    --md-sys-color-error: #ffb4ab;
+    --md-sys-color-on-error: #690005;
+    --md-sys-color-error-container: #93000a;
+    --md-sys-color-on-error-container: #ffdad6;
+    --md-sys-color-success: #8bd99b;
+    --md-sys-color-on-success: #00390f;
+    --md-sys-color-success-container: #0b5220;
+    --md-sys-color-on-success-container: #a8f5b8;
+    --md-sys-color-warning: #f1c100;
+    --md-sys-color-warning-container: #5c4300;
+    --md-sys-color-on-warning-container: #ffdf9e;
 
-    --win-border: rgba(255, 255, 255, 0.08);
-    --win-border-strong: rgba(255, 255, 255, 0.15);
-    --win-card-stroke: rgba(255, 255, 255, 0.05);
+    --md-sys-color-surface: #111318;
+    --md-sys-color-surface-dim: #111318;
+    --md-sys-color-surface-bright: #37393e;
+    --md-sys-color-surface-container-lowest: #0c0e13;
+    --md-sys-color-surface-container-low: #191c20;
+    --md-sys-color-surface-container: #1d2024;
+    --md-sys-color-surface-container-high: #282a2f;
+    --md-sys-color-surface-container-highest: #33353a;
+    --md-sys-color-on-surface: #e2e2e9;
+    --md-sys-color-on-surface-variant: #c3c6cf;
+    --md-sys-color-outline: #8d9199;
+    --md-sys-color-outline-variant: #43474e;
+    --md-sys-color-inverse-surface: #e2e2e9;
+    --md-sys-color-inverse-on-surface: #2e3135;
+    --md-sys-color-inverse-primary: #0b6bcb;
 
-    --win-text: #ffffff;
-    --win-text-secondary: #c7c7c7;
-    --win-text-tertiary: #8a8a8a;
-
-    --win-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 1px rgba(0, 0, 0, 0.4);
-    --win-shadow-flyout: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 1px rgba(0, 0, 0, 0.4);
+    --win-bg-hover: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+    --win-bg-pressed: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
   }
 }
 
+/* ---- Tailwind v4 主题映射（保留 win-* 工具类，新增 md-* 工具类） ---- */
 @theme inline {
-  --color-win-accent: var(--win-accent);
+  --color-win-accent: var(--md-sys-color-primary);
   --color-win-accent-hover: var(--win-accent-hover);
   --color-win-accent-pressed: var(--win-accent-pressed);
-  --color-win-bg: var(--win-bg);
+  --color-win-bg: var(--md-sys-color-surface);
   --color-win-card: var(--win-bg-card);
-  --color-win-card-solid: var(--win-bg-card-solid);
+  --color-win-card-solid: var(--md-sys-color-surface-container-low);
   --color-win-sidebar: var(--win-bg-sidebar);
   --color-win-hover: var(--win-bg-hover);
   --color-win-pressed: var(--win-bg-pressed);
-  --color-win-selected: var(--win-bg-selected);
-  --color-win-border: var(--win-border);
-  --color-win-border-strong: var(--win-border-strong);
-  --color-win-text: var(--win-text);
-  --color-win-text-secondary: var(--win-text-secondary);
+  --color-win-selected: var(--md-sys-color-secondary-container);
+  --color-win-border: var(--md-sys-color-outline-variant);
+  --color-win-border-strong: var(--md-sys-color-outline);
+  --color-win-text: var(--md-sys-color-on-surface);
+  --color-win-text-secondary: var(--md-sys-color-on-surface-variant);
   --color-win-text-tertiary: var(--win-text-tertiary);
-  --color-win-success: var(--win-success);
-  --color-win-warning: var(--win-warning);
-  --color-win-danger: var(--win-danger);
-  --font-sans: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", -apple-system,
-    BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --color-win-success: var(--md-sys-color-success);
+  --color-win-warning: var(--md-sys-color-warning);
+  --color-win-danger: var(--md-sys-color-error);
+
+  --color-md-primary: var(--md-sys-color-primary);
+  --color-md-on-primary: var(--md-sys-color-on-primary);
+  --color-md-primary-container: var(--md-sys-color-primary-container);
+  --color-md-on-primary-container: var(--md-sys-color-on-primary-container);
+  --color-md-secondary-container: var(--md-sys-color-secondary-container);
+  --color-md-on-secondary-container: var(--md-sys-color-on-secondary-container);
+  --color-md-tertiary-container: var(--md-sys-color-tertiary-container);
+  --color-md-surface: var(--md-sys-color-surface);
+  --color-md-surface-low: var(--md-sys-color-surface-container-low);
+  --color-md-surface-container: var(--md-sys-color-surface-container);
+  --color-md-surface-high: var(--md-sys-color-surface-container-high);
+  --color-md-surface-highest: var(--md-sys-color-surface-container-highest);
+  --color-md-on-surface: var(--md-sys-color-on-surface);
+  --color-md-on-surface-variant: var(--md-sys-color-on-surface-variant);
+  --color-md-outline: var(--md-sys-color-outline);
+  --color-md-outline-variant: var(--md-sys-color-outline-variant);
+  --color-md-error: var(--md-sys-color-error);
+  --color-md-error-container: var(--md-sys-color-error-container);
+
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI",
+    "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Code", "Consolas", "SFMono-Regular", monospace;
+
+  --radius-md-xs: var(--md-sys-shape-corner-extra-small);
+  --radius-md-sm: var(--md-sys-shape-corner-small);
+  --radius-md-md: var(--md-sys-shape-corner-medium);
+  --radius-md-lg: var(--md-sys-shape-corner-large);
+  --radius-md-xl: var(--md-sys-shape-corner-extra-large);
 }
 
-/* ============ 基础样式 ============ */
+/* ============ 2. 基础样式与字阶 ============ */
 html,
 body {
   height: 100%;
-  background: var(--win-bg);
-  color: var(--win-text);
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-size: 14px;
+  text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* ============ Fluent Design 组件样式 ============ */
+/* M3 字阶（仅取本项目用得到的档位） */
+.md-typescale-display-small { font-size: 36px; line-height: 44px; font-weight: 400; letter-spacing: 0; }
+.md-typescale-headline-small { font-size: 24px; line-height: 32px; font-weight: 400; }
+.md-typescale-title-large { font-size: 22px; line-height: 28px; font-weight: 400; }
+.md-typescale-title-medium { font-size: 16px; line-height: 24px; font-weight: 500; letter-spacing: 0.15px; }
+.md-typescale-title-small { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: 0.1px; }
+.md-typescale-body-large { font-size: 16px; line-height: 24px; font-weight: 400; letter-spacing: 0.5px; }
+.md-typescale-body-medium { font-size: 14px; line-height: 20px; font-weight: 400; letter-spacing: 0.25px; }
+.md-typescale-body-small { font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: 0.4px; }
+.md-typescale-label-large { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: 0.1px; }
+.md-typescale-label-medium { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.5px; }
+.md-typescale-label-small { font-size: 11px; line-height: 16px; font-weight: 500; letter-spacing: 0.5px; }
 
-/* 亚克力毛玻璃效果 */
+/* 焦点可见环（M3 focus indicator） */
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* ============ 3. 表面与容器 ============ */
+
+/* 半透明玻璃表面（导航/浮层）；M3 surface tint 用主色微调 */
 .acrylic {
-  background: var(--win-bg-card);
-  backdrop-filter: blur(30px) saturate(1.2);
-  -webkit-backdrop-filter: blur(30px) saturate(1.2);
-  border: 1px solid var(--win-card-stroke);
+  background: color-mix(in srgb, var(--md-sys-color-surface-container-low) 88%, transparent);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent);
 }
 
 .acrylic-strong {
-  background: var(--win-bg-sidebar);
-  backdrop-filter: blur(40px) saturate(1.4);
-  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  background: color-mix(in srgb, var(--md-sys-color-surface-container) 86%, transparent);
+  backdrop-filter: blur(32px) saturate(1.6);
+  -webkit-backdrop-filter: blur(32px) saturate(1.6);
 }
 
-/* 卡片 */
+/* 卡片：M3 elevated card —— 12dp 圆角 + level1 高度 */
 .win-card {
-  background: var(--win-bg-card-solid);
-  border: 1px solid var(--win-border);
-  border-radius: var(--win-radius);
-  box-shadow: var(--win-shadow-card);
+  background: var(--md-sys-color-surface-container-low);
+  border: none;
+  border-radius: var(--md-sys-shape-corner-medium);
+  box-shadow: var(--md-sys-elevation-level1);
+  transition: box-shadow var(--md-sys-motion-duration-short4)
+    var(--md-sys-motion-easing-standard);
 }
 
-/* 按钮 */
+/* 可点击卡片：悬停提升到 level2（M3 elevation on hover） */
+a.win-card:hover,
+button.win-card:hover {
+  box-shadow: var(--md-sys-elevation-level2);
+}
+
+/* M3 outlined card 变体 */
+.md-card-outlined {
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-medium);
+  box-shadow: none;
+}
+
+/* M3 filled card 变体 */
+.md-card-filled {
+  background: var(--md-sys-color-surface-container-highest);
+  border: none;
+  border-radius: var(--md-sys-shape-corner-medium);
+  box-shadow: none;
+}
+
+/* ============ 4. 按钮（M3 common button） ============ */
+/* 基类默认 = M3 tonal button（次级填充） */
 .win-btn {
+  --md-btn-container: var(--md-sys-color-secondary-container);
+  --md-btn-label: var(--md-sys-color-on-secondary-container);
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 16px;
-  border-radius: var(--win-radius-sm);
+  height: 40px;
+  min-height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-btn-container);
+  color: var(--md-btn-label);
+  font-family: inherit;
   font-size: 14px;
   font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.05s;
-  border: 1px solid transparent;
-  background: var(--win-bg-card-solid);
-  color: var(--win-text);
-  min-height: 32px;
+  letter-spacing: 0.1px;
+  line-height: 20px;
   white-space: nowrap;
+  cursor: pointer;
+  overflow: hidden;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    box-shadow var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+    background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
 }
 
-.win-btn:hover {
-  background: var(--win-bg-hover);
+/* 状态层：hover 8% / focus 10% / pressed 10%（M3 state layer） */
+.win-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-duration-short2)
+    var(--md-sys-motion-easing-standard);
 }
-
-.win-btn:active {
-  background: var(--win-bg-pressed);
-  transform: scale(0.98);
-}
-
+.win-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.win-btn:focus-visible::before { opacity: var(--md-sys-state-focus-opacity); }
+.win-btn:active::before { opacity: var(--md-sys-state-pressed-opacity); }
+.win-btn:active { border-radius: var(--md-sys-shape-corner-full); }
 .win-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.38;
   cursor: not-allowed;
+  box-shadow: none;
 }
+.win-btn:disabled::before { opacity: 0; }
 
-/* 主按钮 */
+/* 主按钮：M3 filled button */
 .win-btn-primary {
-  background: var(--win-accent);
-  color: var(--win-text-on-accent);
-  border-color: var(--win-accent);
+  --md-btn-container: var(--md-sys-color-primary);
+  --md-btn-label: var(--md-sys-color-on-primary);
+  box-shadow: var(--md-sys-elevation-level0);
 }
+.win-btn-primary:hover { box-shadow: var(--md-sys-elevation-level1); }
 
-.win-btn-primary:hover {
-  background: var(--win-accent-hover);
-}
-
-.win-btn-primary:active {
-  background: var(--win-accent-pressed);
-}
-
-/* 次按钮 */
+/* 次按钮：M3 outlined button */
 .win-btn-secondary {
-  background: var(--win-bg-card-solid);
-  border-color: var(--win-border-strong);
+  --md-btn-container: transparent;
+  --md-btn-label: var(--md-sys-color-primary);
+  border: 1px solid var(--md-sys-color-outline);
 }
 
-.win-btn-secondary:hover {
-  background: var(--win-bg-hover);
-}
-
-/* 危险按钮 */
+/* 危险按钮：M3 filled button（error 色） */
 .win-btn-danger {
-  background: var(--win-danger);
-  color: white;
-  border-color: var(--win-danger);
+  --md-btn-container: var(--md-sys-color-error);
+  --md-btn-label: var(--md-sys-color-on-error);
+  border: none;
 }
 
-.win-btn-danger:hover {
-  background: var(--win-danger-hover);
+/* 文本按钮：M3 text button */
+.win-btn-text {
+  --md-btn-container: transparent;
+  --md-btn-label: var(--md-sys-color-primary);
+  padding: 0 12px;
+  border: none;
 }
 
-/* 输入框 */
+/* 小尺寸（紧凑场景）：M3 允许 32dp 高，标签用 label-medium */
+.win-btn-sm {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+/* 图标按钮：M3 icon button（40dp 圆形） */
+.md-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  overflow: hidden;
+  isolation: isolate;
+  transition: color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.md-icon-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+.md-icon-btn:hover::before { opacity: var(--md-sys-state-hover-opacity); }
+.md-icon-btn:active::before { opacity: var(--md-sys-state-pressed-opacity); }
+.md-icon-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.md-icon-btn.md-icon-btn-filled {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+.md-icon-btn.md-icon-btn-tonal {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.md-icon-btn.md-icon-btn-outlined {
+  border: 1px solid var(--md-sys-color-outline);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* FAB：M3 floating action button（56dp，large 96dp，extended 高 56dp） */
+.md-fab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 56px;
+  min-width: 56px;
+  padding: 0;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  box-shadow: var(--md-sys-elevation-level3);
+  cursor: pointer;
+  overflow: hidden;
+  isolation: isolate;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    box-shadow var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+    transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-emphasized);
+}
+.md-fab:hover { box-shadow: var(--md-sys-elevation-level4); }
+.md-fab:active { transform: scale(0.97); }
+.md-fab.md-fab-extended { padding: 0 20px; }
+.md-fab.md-fab-primary {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+.md-fab.md-fab-surface {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-primary);
+}
+
+/* ============ 5. 文本输入（M3 outlined text field） ============ */
 .win-input {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--win-border-strong);
-  border-radius: var(--win-radius-sm);
-  background: var(--win-bg-card-solid);
-  color: var(--win-text);
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font-family: inherit;
   font-size: 14px;
-  transition: border-color 0.15s;
-  min-height: 32px;
+  letter-spacing: 0.25px;
+  transition:
+    border-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    box-shadow var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
-
+.win-input::placeholder { color: var(--md-sys-color-on-surface-variant); }
+.win-input:hover { border-color: var(--md-sys-color-on-surface); }
 .win-input:focus {
   outline: none;
-  border-color: var(--win-accent);
-  border-bottom-width: 2px;
+  border-color: var(--md-sys-color-primary);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
+}
+.win-input:disabled {
+  border-color: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 4%, transparent);
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+  cursor: not-allowed;
+}
+.win-input[aria-invalid="true"] {
+  border-color: var(--md-sys-color-error);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-error);
 }
 
-.win-input:disabled {
-  background: var(--win-bg-hover);
-  color: var(--win-text-tertiary);
-  cursor: not-allowed;
+/* 前缀 + 输入框拼接（用户名 = 战队前缀 + 昵称）：整组共用一个外轮廓 */
+.md-field-group {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+.md-field-group > .md-field-prefix {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-right: none;
+  border-radius: var(--md-sys-shape-corner-extra-small) 0 0
+    var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
+  user-select: none;
+}
+.md-field-group > .win-input {
+  border-radius: 0 var(--md-sys-shape-corner-extra-small)
+    var(--md-sys-shape-corner-extra-small) 0;
+}
+.md-field-group:focus-within > .md-field-prefix {
+  border-color: var(--md-sys-color-primary);
+}
+/* 后缀（如固定分隔符「丨」）：贴在输入框右侧 */
+.md-field-group > .md-field-suffix {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-left: none;
+  border-radius: 0 var(--md-sys-shape-corner-extra-small)
+    var(--md-sys-shape-corner-extra-small) 0;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
+  user-select: none;
+}
+.md-field-group:focus-within > .md-field-suffix {
+  border-color: var(--md-sys-color-primary);
+}
+.md-field-group > .win-input:has(+ .md-field-suffix) {
+  border-radius: var(--md-sys-shape-corner-extra-small) 0 0
+    var(--md-sys-shape-corner-extra-small);
 }
 
 .win-textarea {
-  min-height: 80px;
+  height: auto;
+  min-height: 96px;
+  padding: 12px 16px;
   resize: vertical;
-  font-family: inherit;
+  line-height: 1.6;
 }
 
 .win-label {
   display: block;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--win-text-secondary);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface-variant);
   margin-bottom: 6px;
 }
 
-/* 标签 / Chip */
+/* M3 switch（当前项目暂无，提供给后续设置项使用） */
+.md-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 52px;
+  height: 32px;
+  border-radius: var(--md-sys-shape-corner-full);
+  border: 2px solid var(--md-sys-color-outline);
+  background: var(--md-sys-color-surface-container-highest);
+  cursor: pointer;
+  transition: background-color var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard),
+    border-color var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+}
+.md-switch[data-checked="true"] {
+  background: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+}
+.md-switch::after {
+  content: "";
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--md-sys-color-outline);
+  transition: transform var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized),
+    width var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-emphasized),
+    height var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-emphasized),
+    background-color var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+}
+.md-switch[data-checked="true"]::after {
+  width: 24px;
+  height: 24px;
+  margin-left: 4px;
+  transform: translateX(18px);
+  background: var(--md-sys-color-on-primary);
+}
+
+/* ============ 6. Chip（M3 assist / filter chip） ============ */
 .win-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 16px;
-  background: var(--win-bg-hover);
-  color: var(--win-text);
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: transparent;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface-variant);
   font-size: 12px;
-  border: 1px solid var(--win-border);
+  font-weight: 500;
+  letter-spacing: 0.5px;
   cursor: default;
   user-select: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    border-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
 }
 
+/* 选中态：M3 filter chip selected —— secondary-container 填充 + 对勾位 */
 .win-chip-accent {
-  background: var(--win-bg-selected);
-  color: var(--win-accent);
-  border-color: var(--win-accent);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border-color: transparent;
 }
 
-.win-chip-removable {
-  cursor: pointer;
-}
-
+.win-chip-removable { cursor: pointer; }
 .win-chip-removable:hover {
-  background: var(--win-bg-pressed);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
 }
 
-/* 导航项 */
+button.win-chip { cursor: pointer; }
+button.win-chip:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+button.win-chip.win-chip-accent:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-secondary-container) 8%, var(--md-sys-color-secondary-container));
+}
+
+/* ============ 7. 导航（M3 navigation rail / bar + 活动指示器） ============ */
+/* 导航项：图标外有 56×32 的胶囊活动指示器（M3 active indicator） */
 .win-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  border-radius: var(--win-radius);
-  color: var(--win-text);
+  height: 48px;
+  padding: 0 16px;
+  border-radius: var(--md-sys-shape-corner-full);
+  color: var(--md-sys-color-on-surface-variant);
   font-size: 14px;
-  cursor: pointer;
-  transition: background 0.15s;
-  position: relative;
-  user-select: none;
-}
-
-.win-nav-item:hover {
-  background: var(--win-bg-hover);
-}
-
-.win-nav-item.active {
-  background: var(--win-bg-selected);
-  color: var(--win-accent);
   font-weight: 500;
+  letter-spacing: 0.1px;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+.win-nav-item:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.win-nav-item.active {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  font-weight: 600;
+}
+/* 旧版左侧竖条在 M3 中由胶囊指示器取代 */
+.win-nav-item.active::before { content: none; }
+
+/* 导航栏（Mobile navigation bar）项 */
+.md-navbar-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 64px;
+  padding: 8px 0 12px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  transition: color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+.md-navbar-item .md-navbar-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 32px;
+  border-radius: var(--md-sys-shape-corner-full);
+  transition: background-color var(--md-sys-motion-duration-medium1)
+    var(--md-sys-motion-easing-emphasized);
+}
+.md-navbar-item.active { color: var(--md-sys-color-on-secondary-container); }
+.md-navbar-item.active .md-navbar-indicator {
+  background: var(--md-sys-color-secondary-container);
+}
+.md-navbar-item:active .md-navbar-indicator {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
 }
 
-.win-nav-item.active::before {
+/* ============ 8. 分段按钮 / 标签页（M3 segmented button） ============ */
+.md-segmented {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-full);
+  overflow: hidden;
+  background: transparent;
+}
+.md-segmented > button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border: none;
+  border-left: 1px solid var(--md-sys-color-outline);
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  transition:
+    background-color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+    color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+.md-segmented > button:first-child { border-left: none; }
+.md-segmented > button:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.md-segmented > button[aria-pressed="true"],
+.md-segmented > button[data-selected="true"] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+/* ============ 9. 对话框（M3 basic dialog，28dp 圆角） ============ */
+.win-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--md-sys-color-scrim) 40%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: md-scrim-in var(--md-sys-motion-duration-medium2)
+    var(--md-sys-motion-easing-standard) both;
+}
+
+.win-modal {
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  border: none;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  box-shadow: var(--md-sys-elevation-level3);
+  animation: md-dialog-in var(--md-sys-motion-duration-medium4)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+
+@keyframes md-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes md-dialog-in {
+  from { opacity: 0; transform: scale(0.9) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes md-scrim-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes md-dialog-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.95) translateY(6px); }
+}
+
+/* ============ 10. 提示条（M3 snackbar） ============ */
+.md-snackbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 280px;
+  max-width: 480px;
+  padding: 12px 16px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  box-shadow: var(--md-sys-elevation-level3);
+  font-size: 14px;
+  letter-spacing: 0.25px;
+  pointer-events: auto;
+  animation: md-snackbar-in var(--md-sys-motion-duration-medium4)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+.md-snackbar[data-leaving="true"] {
+  animation: md-snackbar-out var(--md-sys-motion-duration-short4)
+    var(--md-sys-motion-easing-emphasized-accelerate) both;
+}
+.md-snackbar .md-snackbar-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+.md-snackbar[data-type="success"] .md-snackbar-icon { color: var(--md-sys-color-success); }
+.md-snackbar[data-type="error"] .md-snackbar-icon { color: var(--md-sys-color-error); }
+.md-snackbar[data-type="warning"] .md-snackbar-icon { color: var(--md-sys-color-warning); }
+.md-snackbar[data-type="info"] .md-snackbar-icon { color: var(--md-sys-color-inverse-primary); }
+
+@keyframes md-snackbar-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes md-snackbar-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(12px); }
+}
+
+/* ============ 11. 加载指示（M3 circular / linear progress + 骨架屏） ============ */
+.win-spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 24%, transparent);
+  border-top-color: var(--md-sys-color-primary);
+  border-radius: 50%;
+  animation: md-spin 0.9s linear infinite;
+}
+@keyframes md-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* M3 linear progress indicator（导航进行中显示的顶部进度条） */
+.md-linear-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  z-index: 200;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--md-sys-color-primary) 24%, transparent);
+  pointer-events: none;
+}
+.md-linear-progress::before,
+.md-linear-progress::after {
   content: "";
   position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 16px;
-  background: var(--win-accent);
-  border-radius: 2px;
+  inset: 0;
+  background: var(--md-sys-color-primary);
+  border-radius: var(--md-sys-shape-corner-full);
+}
+/* M3 不确定进度：主条不断伸展与收缩 */
+.md-linear-progress::before {
+  transform-origin: left;
+  animation: md-linear-expand 1.6s var(--md-sys-motion-easing-standard) infinite;
+}
+.md-linear-progress::after {
+  transform-origin: left;
+  animation: md-linear-collapse 1.6s var(--md-sys-motion-easing-standard) infinite;
+}
+@keyframes md-linear-expand {
+  0% { transform: translateX(-100%) scaleX(0.2); }
+  40% { transform: translateX(0%) scaleX(0.6); }
+  100% { transform: translateX(120%) scaleX(0.2); }
+}
+@keyframes md-linear-collapse {
+  0% { transform: translateX(-100%) scaleX(0.1); }
+  60% { transform: translateX(30%) scaleX(0.7); }
+  100% { transform: translateX(130%) scaleX(0.1); }
 }
 
-/* 红点 */
+/* 骨架屏：M3 用 surface container 色调 + 呼吸式高光 */
+.md-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent);
+}
+.md-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent),
+    transparent
+  );
+  animation: md-skeleton-shimmer 1.6s var(--md-sys-motion-easing-standard) infinite;
+}
+@keyframes md-skeleton-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* ============ 12. 徽标 ============ */
 .win-badge-dot {
   position: absolute;
   top: 4px;
   right: 4px;
   min-width: 8px;
   height: 8px;
-  background: var(--win-danger);
+  background: var(--md-sys-color-error);
   border-radius: 50%;
 }
 
@@ -329,43 +974,70 @@ body {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  background: var(--win-danger);
-  color: white;
-  border-radius: 9px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 1;
 }
 
-/* 模态框 */
-.win-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(2px);
-  z-index: 50;
+/* ============ 13. 列表项 ============ */
+.md-list-item {
   display: flex;
   align-items: center;
+  gap: 16px;
+  min-height: 56px;
+  padding: 8px 16px;
+  border-radius: var(--md-sys-shape-corner-small);
+  color: var(--md-sys-color-on-surface);
+  text-decoration: none;
+  transition: background-color var(--md-sys-motion-duration-short3)
+    var(--md-sys-motion-easing-standard);
+}
+.md-list-item:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+
+/* 空态 / 状态视图容器 */
+.md-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  padding: 16px;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
 }
 
-.win-modal {
-  background: var(--win-bg-card-solid);
-  border: 1px solid var(--win-border);
-  border-radius: var(--win-radius-lg);
-  box-shadow: var(--win-shadow-flyout);
-  width: 100%;
-  max-width: 540px;
-  max-height: 90vh;
-  overflow: auto;
+/* 返回链接（M3 text button 外观） */
+.md-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  height: 36px;
+  padding: 0 12px 0 8px;
+  border-radius: var(--md-sys-shape-corner-full);
+  color: var(--md-sys-color-primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--md-sys-motion-duration-short3)
+    var(--md-sys-motion-easing-standard);
+}
+.md-back-link:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
 }
 
-/* Reveal 光效（卡片悬停） */
+/* ============ 14. 悬停光效（保留，弱化为 M3 状态层强度） ============ */
 .win-reveal {
   position: relative;
   overflow: hidden;
 }
-
 .win-reveal::after {
   content: "";
   position: absolute;
@@ -373,22 +1045,21 @@ body {
   border-radius: inherit;
   pointer-events: none;
   background: radial-gradient(
-    200px circle at var(--reveal-x, 50%) var(--reveal-y, 50%),
-    rgba(255, 255, 255, 0.15),
-    transparent 40%
+    240px circle at var(--reveal-x, 50%) var(--reveal-y, 50%),
+    color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent),
+    transparent 42%
   );
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity var(--md-sys-motion-duration-medium1)
+    var(--md-sys-motion-easing-standard);
 }
+.win-reveal:hover::after { opacity: 1; }
 
-.win-reveal:hover::after {
-  opacity: 1;
-}
-
-/* Markdown 渲染样式 */
+/* ============ 15. Markdown 渲染样式 ============ */
 .markdown-body {
-  line-height: 1.7;
-  color: var(--win-text);
+  line-height: 1.75;
+  color: var(--md-sys-color-on-surface);
+  word-break: break-word;
 }
 
 .markdown-body h1,
@@ -399,54 +1070,49 @@ body {
   margin: 1.2em 0 0.6em;
   line-height: 1.3;
 }
-
 .markdown-body h1 { font-size: 1.5em; }
 .markdown-body h2 { font-size: 1.3em; }
 .markdown-body h3 { font-size: 1.15em; }
 .markdown-body h4 { font-size: 1em; }
 
-.markdown-body p {
-  margin: 0.6em 0;
-}
+.markdown-body p { margin: 0.6em 0; }
 
 .markdown-body ul,
 .markdown-body ol {
   padding-left: 1.5em;
   margin: 0.6em 0;
 }
-
-.markdown-body li {
-  margin: 0.3em 0;
-}
+.markdown-body li { margin: 0.3em 0; }
 
 .markdown-body a {
-  color: var(--win-accent);
+  color: var(--md-sys-color-primary);
   text-decoration: underline;
 }
 
 .markdown-body blockquote {
-  border-left: 3px solid var(--win-accent);
-  padding-left: 12px;
+  border-left: 3px solid var(--md-sys-color-primary);
+  padding: 4px 0 4px 12px;
   margin: 0.8em 0;
-  color: var(--win-text-secondary);
+  color: var(--md-sys-color-on-surface-variant);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 5%, transparent);
+  border-radius: 0 var(--md-sys-shape-corner-small) var(--md-sys-shape-corner-small) 0;
 }
 
 .markdown-body code {
-  background: var(--win-bg-hover);
+  background: var(--md-sys-color-surface-container-high);
   padding: 2px 6px;
-  border-radius: 4px;
-  font-family: "Cascadia Code", "Consolas", monospace;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  font-family: var(--font-mono);
   font-size: 0.9em;
 }
 
 .markdown-body pre {
-  background: var(--win-bg-hover);
-  padding: 12px;
-  border-radius: var(--win-radius-sm);
+  background: var(--md-sys-color-surface-container-high);
+  padding: 12px 16px;
+  border-radius: var(--md-sys-shape-corner-medium);
   overflow-x: auto;
   margin: 0.8em 0;
 }
-
 .markdown-body pre code {
   background: transparent;
   padding: 0;
@@ -454,7 +1120,7 @@ body {
 
 .markdown-body img {
   max-width: 100%;
-  border-radius: var(--win-radius-sm);
+  border-radius: var(--md-sys-shape-corner-medium);
   margin: 0.6em 0;
 }
 
@@ -463,71 +1129,263 @@ body {
   width: 100%;
   margin: 0.8em 0;
 }
-
 .markdown-body th,
 .markdown-body td {
-  border: 1px solid var(--win-border);
+  border: 1px solid var(--md-sys-color-outline-variant);
   padding: 8px 12px;
   text-align: left;
 }
-
 .markdown-body th {
-  background: var(--win-bg-hover);
+  background: var(--md-sys-color-surface-container);
   font-weight: 600;
 }
-
 .markdown-body hr {
   border: none;
-  border-top: 1px solid var(--win-border);
+  border-top: 1px solid var(--md-sys-color-outline-variant);
   margin: 1em 0;
 }
 
-/* 滚动条 */
+/* ============ 16. 页面切换动效（M3 shared axis / fade through） ============ */
+/* React <ViewTransition> 生成的类名由 next.config 的 viewTransition 开关启用；
+   这里定义 M3 的动效曲线与方向语义 */
+:root {
+  --md-duration-exit: var(--md-sys-motion-duration-short4);
+  --md-duration-enter: 210ms;
+}
+
+::view-transition-old(.md-nav-forward) {
+  animation:
+    var(--md-duration-exit) var(--md-sys-motion-easing-emphasized-accelerate) both md-fade reverse,
+    400ms var(--md-sys-motion-easing-emphasized) both md-slide-x reverse;
+}
+::view-transition-new(.md-nav-forward) {
+  animation:
+    var(--md-duration-enter) var(--md-sys-motion-easing-emphasized-decelerate)
+    var(--md-duration-exit) both md-fade,
+    400ms var(--md-sys-motion-easing-emphasized) both md-slide-x;
+}
+::view-transition-old(.md-nav-back) {
+  --md-slide-offset: 60px;
+  animation:
+    var(--md-duration-exit) var(--md-sys-motion-easing-emphasized-accelerate) both md-fade reverse,
+    400ms var(--md-sys-motion-easing-emphasized) both md-slide-x reverse;
+}
+::view-transition-new(.md-nav-back) {
+  --md-slide-offset: -60px;
+  animation:
+    var(--md-duration-enter) var(--md-sys-motion-easing-emphasized-decelerate)
+    var(--md-duration-exit) both md-fade,
+    400ms var(--md-sys-motion-easing-emphasized) both md-slide-x;
+}
+
+/* 同路由内容切换：M3 fade through（淡出→淡入，容器不动） */
+::view-transition-old(.md-fade-through) {
+  animation: 90ms var(--md-sys-motion-easing-standard-accelerate) both md-fade reverse;
+}
+::view-transition-new(.md-fade-through) {
+  animation: 210ms var(--md-sys-motion-easing-standard-decelerate) 90ms both md-fade;
+}
+
+/* 容器变换（列表卡片 → 详情） */
+::view-transition-group(.md-shared-morph) {
+  animation-duration: 400ms;
+  animation-timing-function: var(--md-sys-motion-easing-emphasized);
+}
+
+@keyframes md-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes md-slide-x {
+  from { translate: var(--md-slide-offset, 60px); }
+  to { translate: 0; }
+}
+
+/* 页面入场（无 View Transition 支持时的兜底）：M3 fade through */
+.md-page-enter {
+  animation: md-page-enter var(--md-sys-motion-duration-medium4)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+@keyframes md-page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 列表项依次入场（stagger，M3 强调缓动） */
+.md-stagger > * {
+  animation: md-page-enter var(--md-sys-motion-duration-medium4)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+.md-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.md-stagger > *:nth-child(2) { animation-delay: 30ms; }
+.md-stagger > *:nth-child(3) { animation-delay: 60ms; }
+.md-stagger > *:nth-child(4) { animation-delay: 90ms; }
+.md-stagger > *:nth-child(5) { animation-delay: 120ms; }
+.md-stagger > *:nth-child(6) { animation-delay: 150ms; }
+.md-stagger > *:nth-child(n + 7) { animation-delay: 180ms; }
+
+/* ============ 17. 滚动条 ============ */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 5px;
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 20%, transparent);
+  border-radius: var(--md-sys-shape-corner-full);
   border: 2px solid transparent;
   background-clip: content-box;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.35);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 36%, transparent);
   background-clip: content-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    background-clip: content-box;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.35);
-    background-clip: content-box;
-  }
+/* ============ 18. 应用骨架（导航栏 / 导航条 / 顶栏 / FAB） ============ */
+/* 布局：≥768px 用 M3 navigation rail（左），<768px 用 M3 navigation bar（底） */
+.app-rail {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 88px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 12px 0 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent);
 }
 
-/* 加载指示器（StateView/Loading 组件使用） */
-.win-spinner {
-  display: inline-block;
-  width: 22px;
-  height: 22px;
-  border: 2.5px solid var(--win-border, rgba(0, 0, 0, 0.15));
-  border-top-color: var(--win-accent, #0067c0);
+.app-rail-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0 12px;
+  text-decoration: none;
+}
+
+.app-rail-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 72px;
+  padding: 4px 0 8px;
+  border-radius: var(--md-sys-shape-corner-large);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  transition: color var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+.app-rail-item .app-rail-indicator {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 32px;
+  border-radius: var(--md-sys-shape-corner-full);
+  transition: background-color var(--md-sys-motion-duration-medium1)
+    var(--md-sys-motion-easing-emphasized);
+}
+.app-rail-item:hover .app-rail-indicator {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.app-rail-item.active { color: var(--md-sys-color-on-secondary-container); font-weight: 600; }
+.app-rail-item.active .app-rail-indicator {
+  background: var(--md-sys-color-secondary-container);
+}
+
+.app-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px 16px calc(104px + env(safe-area-inset-bottom, 0px));
+}
+
+/* M3 small top app bar（仅移动端；桌面由导航栏承担导航职责） */
+.app-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 64px;
+  padding: 0 8px 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent);
+}
+
+.app-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent);
+}
+
+/* 导航项加载中的小指示器（useLinkStatus） */
+.md-nav-pending {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
+  border-top-color: var(--md-sys-color-primary);
   border-radius: 50%;
-  animation: win-spin 0.8s linear infinite;
+  animation: md-spin 0.9s linear infinite;
 }
 
-@keyframes win-spin {
-  to {
-    transform: rotate(360deg);
+.app-fab {
+  position: fixed;
+  left: 16px;
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+}
+
+@media (min-width: 768px) {
+  .app-rail { display: flex; }
+  .app-bar { display: none; }
+  .app-navbar { display: none; }
+  .app-main { padding: 24px 24px 48px; }
+  .app-fab { left: 104px; bottom: 24px; }
+}
+
+/* ============ 19. 无障碍：减少动态效果 ============ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }

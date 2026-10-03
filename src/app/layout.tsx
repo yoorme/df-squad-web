@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { SessionProvider } from "next-auth/react";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
@@ -9,6 +9,17 @@ import "./globals.css";
 // 全站动态渲染：站点标题依赖数据库中的战队前缀，
 // 且避免构建期（GitHub Actions 无数据库连接）预渲染访问数据库
 export const dynamic = "force-dynamic";
+
+// 浏览器地址栏/状态栏配色跟随 M3 表面色（移动端沉浸式观感）
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8f9ff" },
+    { media: "(prefers-color-scheme: dark)", color: "#111318" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   const { teamPrefix, iconUpdatedAt } = await getSiteSettings();

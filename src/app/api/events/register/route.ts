@@ -111,26 +111,35 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
             where: { id: { in: overflowIds } },
             data: { squadId: null, isSubstitute: true },
           });
-          if (overflowIds.includes(registrationId)) {
-            return ok({
-              success: false,
-              fellbackToSubstitute: true,
-              message: "该分队已被其他队员抢先报名，已自动加入替补",
-              registrationId,
-            });
-          }
         }
       }
     }
 
-    return ok({
-      success: !fellbackToSubstitute,
-      registrationId,
-      isSubstitute: newIsSubstitute,
-      fellbackToSubstitute,
-      message: fellbackToSubstitute ? "该分队已满，已自动加入替补" : undefined,
+    // 6. 以数据库最终状态为准返回。
+    //    上面的复查读取的是本请求的快照，并发下可能已过期
+    //    （例如本行被另一个并发请求挤到替补），直接按快照返回会出现
+    //    "提示报名成功、刷新后却在替补席"的矛盾，因此重新读一次自己的报名行。
+    const finalReg = await prisma.registration.findUnique({
+      where: { id: registrationId },
+      select: { squadId: true, isSubstitute: true },
     });
-  } catch (e: any) {
+    const finalIsSubstitute = finalReg
+      ? finalReg.isSubstitute || finalReg.squadId === null
+      : newIsSubstitute;
+    const fellback = finalIsSubstitute && !asSubstitute;
+
+    return ok({
+      success: !fellback,
+      registrationId,
+      isSubstitute: finalIsSubstitute,
+      fellbackToSubstitute: fellback,
+      message: fellback
+        ? fellbackToSubstitute
+          ? "该分队已满，已自动加入替补"
+          : "该分队已被其他队员抢先报名，已自动加入替补"
+        : undefined,
+    });
+  } catch (e: unknown) {
     // 唯一索引冲突 = 并发重复报名
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return fail("您已报名，请先取消再重新选择");

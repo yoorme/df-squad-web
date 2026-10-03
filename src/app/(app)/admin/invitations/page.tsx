@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
+import { BackLink } from "@/components/ui/BackLink";
+import useSWR from "swr";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { Modal } from "@/components/ui/Modal";
 import { formatDateTime } from "@/lib/constants";
-import { Loading } from "@/components/ui/StateView";
+import { fetcher } from "@/lib/fetcher";
+import { apiFetch, apiJson } from "@/lib/client-api";
+import { SkeletonList, ErrorState, Empty } from "@/components/ui/StateView";
 
 interface Invitation {
   id: string;
@@ -22,21 +25,15 @@ export default function AdminInvitationsPage() {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const [items, setItems] = useState<Invitation[]>([]);
-  const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [maxUses, setMaxUses] = useState("10");
   const [creating, setCreating] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    const res = await fetch("/api/admin/invitations");
-    const data = await res.json();
-    if (data.ok) setItems(data.data);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
+  const { data, error, isLoading, mutate } = useSWR<Invitation[]>(
+    "/api/admin/invitations",
+    fetcher
+  );
+  const items = data ?? [];
 
   const handleCreate = async () => {
     const num = Number(maxUses);
@@ -45,17 +42,12 @@ export default function AdminInvitationsPage() {
       return;
     }
     setCreating(true);
-    const res = await fetch("/api/admin/invitations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ maxUses: num }),
-    });
-    const data = await res.json();
+    const data = await apiJson("/api/admin/invitations", "POST", { maxUses: num });
     setCreating(false);
     if (data.ok) {
       toast("邀请码已生成", "success");
       setCreateOpen(false);
-      load();
+      mutate();
     } else {
       toast(data.error || "生成失败", "error");
     }
@@ -68,11 +60,10 @@ export default function AdminInvitationsPage() {
       danger: true,
     });
     if (!yes) return;
-    const res = await fetch(`/api/admin/invitations?id=${item.id}`, { method: "DELETE" });
-    const data = await res.json();
+    const data = await apiFetch(`/api/admin/invitations?id=${item.id}`, { method: "DELETE" });
     if (data.ok) {
       toast("已删除", "success");
-      load();
+      mutate();
     } else {
       toast(data.error || "删除失败", "error");
     }
@@ -104,10 +95,7 @@ export default function AdminInvitationsPage() {
 
   return (
     <div style={{ maxWidth: 880, margin: "0 auto" }}>
-      <Link href="/admin" style={{ fontSize: 13, color: "var(--win-text-secondary)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        返回管理首页
-      </Link>
+      <div style={{ marginBottom: 12 }}><BackLink href="/admin" label="返回管理首页" /></div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
         <div>
@@ -119,10 +107,12 @@ export default function AdminInvitationsPage() {
         <button className="win-btn win-btn-primary" onClick={() => setCreateOpen(true)}>+ 生成邀请码</button>
       </div>
 
-      {loading ? (
-        <Loading />
+      {isLoading && !data ? (
+        <SkeletonList count={4} />
+      ) : error && !data ? (
+        <ErrorState message={error.message || "加载失败"} onRetry={() => mutate()} />
       ) : items.length === 0 ? (
-        <div className="win-card" style={{ padding: 40, textAlign: "center", color: "var(--win-text-tertiary)" }}>暂无邀请码</div>
+        <Empty text="暂无邀请码" />
       ) : (
         <div className="win-card" style={{ overflow: "hidden" }}>
           {items.map((item, idx) => (
