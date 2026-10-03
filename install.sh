@@ -372,7 +372,10 @@ restore_env_backup() {
   fi
 }
 
-fetch_dist() {
+# 下载并解压产物到临时目录（不触碰 INSTALL_DIR，服务可继续运行）。
+# 更新流程用它在停机前完成最耗时、最容易失败的一步：
+# 下载失败时直接退出，站点不受影响。
+download_and_extract() {
   log "下载预构建产物..."
   TMP_TAR="/tmp/squad-signup-dist.tar.gz"
 
@@ -395,6 +398,13 @@ fetch_dist() {
   rm -f "$TMP_TAR"; TMP_TAR=""
   [[ -f "$TMP_EXTRACT/standalone/server.js" ]] || die "产物中缺少 standalone/server.js，产物不完整"
   [[ -d "$TMP_EXTRACT/prisma" ]] || die "产物中缺少 prisma 目录，产物不完整"
+  ok "产物校验通过，已解压到临时目录"
+}
+
+# 把已解压的产物替换到 INSTALL_DIR（调用前应先停止服务，避免运行中的
+# Next 进程懒加载仍留在旧目录里的 chunk）
+install_dist() {
+  [[ -n "${TMP_EXTRACT:-}" && -d "$TMP_EXTRACT" ]] || die "install_dist: 临时产物不存在"
 
   # 确保 INSTALL_DIR 存在
   mkdir -p "$INSTALL_DIR"
@@ -418,6 +428,12 @@ fetch_dist() {
 
   # 上传文件持久目录（独立于 standalone 产物，版本更新不丢图）
   mkdir -p "$INSTALL_DIR/uploads"
+}
+
+# 下载 + 替换（首次安装等场景使用；更新流程请分开调用以便在停机前完成下载）
+fetch_dist() {
+  download_and_extract
+  install_dist
 }
 
 # ---------------- 生成 .env ----------------
@@ -959,7 +975,13 @@ do_update_all() {
   ensure_node
   load_deploy_conf
 
-  # 先停止全部实例，避免替换 standalone 时文件占用
+  # 1) 先在服务运行中完成下载与校验（最耗时、最易失败的一步）：
+  #    下载失败直接退出，站点全程无感；成功后再进入停机窗口
+  download_and_extract
+
+  # 2) 停止全部实例：
+  #    - 避免替换 standalone 时运行中的进程懒加载旧 chunk
+  #    - 保证「新代码 + 旧库结构」不会同时生效
   local -a service_names=()
   while IFS=$'\037' read -r id port prefix url service env_file; do
     service_names+=("$service")
@@ -972,13 +994,20 @@ do_update_all() {
     fi
   done < <(list_instances)
 
-  fetch_dist
+  # 3) 替换产物
+  install_dist
 
-  # 安装一次共享迁移依赖
+  # 4) 迁移依赖：已装好则跳过。
+  #    每次更新都重跑 npm install 会让停机时间从数十秒拉长到数分钟
+  #    （npm 官方源在部分网络下极慢，甚至长时间卡在拉取元数据）
   cd "$INSTALL_DIR" || die "无法进入 $INSTALL_DIR"
-  log "安装共享迁移依赖..."
-  npm install --no-audit --no-fund --no-save prisma@^6 @prisma/client@^6 tsx@^4 bcryptjs@^3 2>/dev/null || \
-    npm install --no-audit --no-fund prisma@^6 @prisma/client@^6 tsx@^4 bcryptjs@^3
+  if [[ -x "$INSTALL_DIR/node_modules/.bin/prisma" && -x "$INSTALL_DIR/node_modules/.bin/tsx" ]]; then
+    log "迁移依赖已存在，跳过安装"
+  else
+    log "安装迁移+seed 必需依赖（prisma@6 @prisma/client@6 tsx@4 bcryptjs@3）..."
+    npm install --no-audit --no-fund --no-save prisma@^6 @prisma/client@^6 tsx@^4 bcryptjs@^3 2>/dev/null || \
+      npm install --no-audit --no-fund prisma@^6 @prisma/client@^6 tsx@^4 bcryptjs@^3
+  fi
   ./node_modules/.bin/prisma generate
 
   while IFS=$'\037' read -r id port prefix url service env_file; do
