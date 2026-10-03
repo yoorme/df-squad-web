@@ -1,5 +1,6 @@
 "use client";
 
+import { ViewTransition } from "react";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 import { formatDateTime } from "@/lib/constants";
@@ -54,7 +55,9 @@ export default function MemberDetailPage() {
       {/* 基本信息 */}
       <section className="win-card win-reveal" style={{ padding: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-          <h1 className="md-typescale-title-large" style={{ fontSize: 22, fontWeight: 600 }}>{member.username}</h1>
+          <ViewTransition name={`member-name-${member.id}`} share="md-shared-morph">
+            <h1 className="md-typescale-title-large" style={{ fontSize: 22, fontWeight: 600 }}>{member.username}</h1>
+          </ViewTransition>
           <span
             className="win-chip"
             style={member.role === "ADMIN" ? { background: "var(--win-bg-selected)", color: "var(--win-accent)", borderColor: "var(--win-accent)", fontSize: 11, padding: "2px 8px" } : { fontSize: 11, padding: "2px 8px" }}

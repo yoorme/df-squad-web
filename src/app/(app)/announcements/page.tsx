@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, ViewTransition } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
@@ -110,18 +110,21 @@ export default function AnnouncementsPage() {
                         已归档
                       </span>
                     )}
-                    <h3
-                      className="md-typescale-title-medium"
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 600,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {item.title}
-                    </h3>
+                    {/* 共享元素：标题与详情页大标题形变衔接（同 name，见详情页） */}
+                    <ViewTransition name={`announcement-title-${item.id}`} share="md-shared-morph">
+                      <h3
+                        className="md-typescale-title-medium"
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 600,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {item.title}
+                      </h3>
+                    </ViewTransition>
                   </div>
                   <div
                     className="md-typescale-body-small"

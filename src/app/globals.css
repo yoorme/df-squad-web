@@ -317,6 +317,20 @@ button.win-card:hover {
   box-shadow: var(--md-sys-elevation-level2);
 }
 
+/* 触摸按压反馈：按下时叠一层主色状态层。
+   移动端没有 hover，这是点按卡片/列表项时最主要的即时反馈 */
+a.win-card:active,
+button.win-card:active,
+.md-list-item:active {
+  background: color-mix(
+    in srgb,
+    var(--md-sys-color-primary) 10%,
+    var(--md-sys-color-surface-container-low)
+  );
+  transition: background-color var(--md-sys-motion-duration-short2)
+    var(--md-sys-motion-easing-standard);
+}
+
 /* M3 outlined card 变体 */
 .md-card-outlined {
   background: var(--md-sys-color-surface);
@@ -747,16 +761,28 @@ button.win-chip.win-chip-accent:hover {
   width: 64px;
   height: 32px;
   border-radius: var(--md-sys-shape-corner-full);
-  transition: background-color var(--md-sys-motion-duration-medium1)
-    var(--md-sys-motion-easing-emphasized);
 }
 .md-navbar-item.active { color: var(--md-sys-color-on-secondary-container); }
-.md-navbar-item.active .md-navbar-indicator {
-  background: var(--md-sys-color-secondary-container);
-}
+/* 按压反馈：状态层叠在图标上（指示器由 app-navbar-pill 统一绘制） */
 .md-navbar-item:active .md-navbar-indicator {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
 }
+
+/* 底部导航条的滑动指示器：由 AppShell 计算 left（等宽均分），
+   切换栏目时按 M3 emphasized 缓动滑到目标项，而不是各项独立闪现代替 */
+.app-navbar-pill {
+  position: absolute;
+  top: 8px;
+  height: 32px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-secondary-container);
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: left var(--md-sys-motion-duration-medium2)
+    var(--md-sys-motion-easing-emphasized);
+}
+/* 图标/文字压在指示器之上 */
+.md-navbar-item { z-index: 1; }
 
 /* ============ 8. 分段按钮 / 标签页（M3 segmented button） ============ */
 .md-segmented {
@@ -1194,10 +1220,17 @@ button.win-chip.win-chip-accent:hover {
   animation: 210ms var(--md-sys-motion-easing-standard-decelerate) 90ms both md-fade;
 }
 
-/* 容器变换（列表卡片 → 详情） */
+/* 容器变换 / 共享元素（列表标题 → 详情标题）：
+   形变过程叠加轻微模糊，遮住文字在两处布局间的像素插值伪影 */
 ::view-transition-group(.md-shared-morph) {
   animation-duration: 400ms;
   animation-timing-function: var(--md-sys-motion-easing-emphasized);
+}
+::view-transition-image-pair(.md-shared-morph) {
+  animation-name: md-via-blur;
+}
+@keyframes md-via-blur {
+  30% { filter: blur(3px); }
 }
 
 @keyframes md-fade {
@@ -1337,6 +1370,16 @@ button.win-chip.win-chip-accent:hover {
   top: 0;
   z-index: 30;
   border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent);
+  transition:
+    background-color var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard),
+    box-shadow var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard),
+    border-color var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
+}
+/* 内容滚动后：顶栏提升高度层级并与内容分层（M3 on-scroll 行为） */
+.app-bar.is-scrolled {
+  background: color-mix(in srgb, var(--md-sys-color-surface-container) 92%, transparent);
+  box-shadow: var(--md-sys-elevation-level2);
+  border-bottom-color: transparent;
 }
 
 .app-navbar {

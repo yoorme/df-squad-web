@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, ViewTransition } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -152,7 +152,11 @@ export default function AnnouncementDetailPage() {
                   已归档
                 </span>
               )}
-              <h1 style={{ fontSize: 22, fontWeight: 600 }}>{detail.title}</h1>
+              <ViewTransition name={`announcement-title-${detail.id}`} share="md-shared-morph">
+                <h1 className="md-typescale-title-large" style={{ fontSize: 22, fontWeight: 600 }}>
+                  {detail.title}
+                </h1>
+              </ViewTransition>
             </div>
             <div style={{ fontSize: 12, color: "var(--win-text-tertiary)", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
               <Link href={`/members/${detail.author.id}`} style={{ color: "var(--win-text-secondary)", textDecoration: "none" }}>{detail.author.username}</Link>

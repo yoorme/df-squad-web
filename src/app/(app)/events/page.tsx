@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, ViewTransition } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { formatDateTime } from "@/lib/constants";
@@ -150,7 +150,9 @@ function EventCard({ event }: { event: EventListItem }) {
               </span>
             )}
           </div>
-          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{event.title}</h3>
+          <ViewTransition name={`event-title-${event.id}`} share="md-shared-morph">
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{event.title}</h3>
+          </ViewTransition>
           <div style={{ fontSize: 13, color: "var(--win-text-secondary)" }}>
             {formatDateTime(event.eventTime)}
           </div>

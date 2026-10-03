@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ViewTransition, type ReactNode } from "react";
+import { useEffect, useState, ViewTransition, type ReactNode } from "react";
 import { NavLink } from "./NavLink";
 import { MaterialIcon } from "@/components/icons/MaterialIcon";
 
@@ -48,6 +48,19 @@ export function AppShell({ children, navItems, showAdmin, iconVersion, teamDispl
   const sectionKey = pathname?.split("/")[1] ?? "";
   const title = SECTION_TITLES[sectionKey] ?? "战队报名";
 
+  // 底部导航条的滑动指示器：定位到当前栏目对应的项（等宽均分，无需测量）
+  const isItemActive = (href: string) => pathname === href || pathname?.startsWith(href + "/");
+  const activeIndex = Math.max(0, items.findIndex((it) => isItemActive(it.href)));
+
+  // 顶栏滚动状态（M3：内容滚动后顶栏提升高度层级，与内容分层）
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "row" }}>
       {/* 桌面/横屏：M3 navigation rail（导航栏），活动项带胶囊指示器 */}
@@ -87,7 +100,7 @@ export function AppShell({ children, navItems, showAdmin, iconVersion, teamDispl
       <div className="app-column">
         {/* 移动端：M3 small top app bar（大标题由页面自身渲染）。
             不在此放入口按钮：管理入口已在底部导航条里（与桌面导航栏共用同一份 items） */}
-        <header className="acrylic-strong app-bar">
+        <header className={`acrylic-strong app-bar${scrolled ? " is-scrolled" : ""}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/favicon.ico?v=${iconVersion ?? 0}`}
@@ -108,7 +121,8 @@ export function AppShell({ children, navItems, showAdmin, iconVersion, teamDispl
             · nav-fade   —— 主导航切换：fade through（无位移，同级换内容）
             · nav-forward —— 进入详情：shared axis X 前进入场
             · nav-back    —— 返回列表：shared axis X 后退入场
-            · default: none —— 首次加载/无关更新不播动画 */}
+            · default: fade through —— 浏览器返回/手势返回不带转场类型，
+              回落为交叉淡化（移动端返回手势的主要路径），避免生硬跳变 */}
         <main className="app-main" id="main-content">
           <ViewTransition
             default="none"
@@ -116,13 +130,13 @@ export function AppShell({ children, navItems, showAdmin, iconVersion, teamDispl
               "nav-fade": "md-fade-through",
               "nav-forward": "md-nav-forward",
               "nav-back": "md-nav-back",
-              default: "none",
+              default: "md-fade-through",
             }}
             exit={{
               "nav-fade": "md-fade-through",
               "nav-forward": "md-nav-forward",
               "nav-back": "md-nav-back",
-              default: "none",
+              default: "md-fade-through",
             }}
           >
             {children}
@@ -130,8 +144,18 @@ export function AppShell({ children, navItems, showAdmin, iconVersion, teamDispl
         </main>
       </div>
 
-      {/* 移动端：M3 navigation bar（底部导航条） */}
+      {/* 移动端：M3 navigation bar（底部导航条）。
+          活动指示器是一个整体滑动的胶囊（而非各项独立出现），
+          切换栏目时按 M3 emphasized 缓动滑到目标项 */}
       <nav className="acrylic-strong app-navbar" aria-label="主导航">
+        <span
+          className="app-navbar-pill"
+          aria-hidden
+          style={{
+            left: `${((activeIndex + 0.5) * 100) / items.length}%`,
+            width: `min(64px, ${100 / items.length}%)`,
+          }}
+        />
         {items.map((item) => (
           <NavLink key={item.href} {...item} variant="bar" />
         ))}

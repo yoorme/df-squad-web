@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, ViewTransition } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -174,7 +174,9 @@ export default function EventDetailPage() {
                 </span>
               )}
             </div>
-            <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>{event.title}</h1>
+            <ViewTransition name={`event-title-${event.id}`} share="md-shared-morph">
+              <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>{event.title}</h1>
+            </ViewTransition>
             <div style={{ fontSize: 13, color: "var(--win-text-secondary)" }}>{formatDateTime(event.eventTime)}</div>
           </div>
         </div>

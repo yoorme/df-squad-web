@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, ViewTransition } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { formatDateTime } from "@/lib/constants";
@@ -84,7 +84,9 @@ export default function MembersPage() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 16, fontWeight: 600 }}>{m.username}</span>
+                      <ViewTransition name={`member-name-${m.id}`} share="md-shared-morph">
+                        <span style={{ fontSize: 16, fontWeight: 600 }}>{m.username}</span>
+                      </ViewTransition>
                       <span
                         className="win-chip"
                         style={m.role === "ADMIN" ? { background: "var(--win-bg-selected)", color: "var(--win-accent)", borderColor: "var(--win-accent)", fontSize: 11, padding: "2px 8px" } : { fontSize: 11, padding: "2px 8px" }}
