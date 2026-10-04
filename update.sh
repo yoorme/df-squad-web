@@ -3,7 +3,7 @@
 # 实际逻辑在 install.sh 的 --update-all 中，本脚本只负责取最新 install.sh 并执行。
 set -euo pipefail
 
-REPO="yoorme/squad-signup-latest"
+REPO="yoorme/df-squad-web"
 BRANCH="${BRANCH:-main}"
 
 if [[ ${EUID:-$(id -u)} -eq 0 ]]; then

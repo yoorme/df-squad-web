@@ -10,7 +10,7 @@
 #
 # 用法：
 #   新增/重装战队网站：
-#     curl -fsSL https://raw.githubusercontent.com/yoorme/squad-signup-latest/main/install.sh | bash
+#     curl -fsSL https://raw.githubusercontent.com/yoorme/df-squad-web/main/install.sh | bash
 #
 #   指定参数：
 #     curl -fsSL ... | bash -s -- --update
@@ -19,7 +19,7 @@
 #     curl -fsSL ... | bash -s -- --status
 #
 #   更新所有实例请使用：
-#     curl -fsSL https://raw.githubusercontent.com/yoorme/squad-signup-latest/main/update.sh | bash
+#     curl -fsSL https://raw.githubusercontent.com/yoorme/df-squad-web/main/update.sh | bash
 #
 #   非交互（自动化部署）：
 #     DATABASE_URL=... DIRECT_URL=... NEXTAUTH_URL=https://... \
@@ -51,7 +51,7 @@ cleanup() {
 trap cleanup EXIT
 
 # ---------------- 全局配置 ----------------
-REPO="yoorme/squad-signup-latest"
+REPO="yoorme/df-squad-web"
 BRANCH="${BRANCH:-main}"
 # 预构建产物下载地址（GitHub Release，由 GitHub Actions 自动构建上传）
 DIST_URL="https://github.com/${REPO}/releases/download/latest/dist.tar.gz"
