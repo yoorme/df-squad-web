@@ -132,6 +132,13 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
           where: { id: user.id },
           data: { passwordHash, tokenVersion: { increment: 1 } },
         });
+        // 同时停用该账号的推送设备：令牌失效后 App 收到 401 只能清本地会话，
+        // 无法调用解绑接口（需要有效令牌），若不处理会继续向该设备推送旧账号通知。
+        // App 重新登录后会幂等重报绑定（enabled 置回 true），因此可自愈。
+        await tx.device.updateMany({
+          where: { userId: user.id },
+          data: { enabled: false },
+        });
       }
 
       // 更新能力

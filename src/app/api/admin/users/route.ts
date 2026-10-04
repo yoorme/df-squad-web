@@ -74,11 +74,19 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (Buffer.byteLength(newPassword, "utf8") > 72) return fail("密码过长（最多 72 字节）");
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  // tokenVersion +1：该用户在 App 上的登录令牌立即失效，需用新密码重新登录
-  await prisma.user.update({
-    where: { id },
-    data: { passwordHash, tokenVersion: { increment: 1 } },
-  });
+  // tokenVersion +1：该用户在 App 上的登录令牌立即失效，需用新密码重新登录。
+  // 同事务停用其推送设备：令牌失效后 App 无法主动解绑（解绑接口需要有效令牌），
+  // 不停用会导致该设备继续收到旧账号推送；App 重新登录后会幂等重报绑定（自愈）。
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id },
+      data: { passwordHash, tokenVersion: { increment: 1 } },
+    }),
+    prisma.device.updateMany({
+      where: { userId: id },
+      data: { enabled: false },
+    }),
+  ]);
   return ok({ success: true });
 });
 

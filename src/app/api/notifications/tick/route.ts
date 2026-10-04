@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fail, ok, withErrorHandler } from "@/lib/api";
-import { pushEventReminder, jpushConfigured } from "@/lib/push";
+import { pushEventReminder, jpushConfigured, activeDeviceCutoff } from "@/lib/push";
 import { autoArchiveExpiredEvents } from "@/lib/event-auto-archive";
 
 // 比赛临近提醒扫描（由 systemd timer 每分钟通过 curl 调用，需 CRON_SECRET）
@@ -38,6 +38,17 @@ async function runScan() {
   const horizonMs = 24 * 60 * 60 * 1000; // 扫描未来 24 小时（提前量上限 120 分钟，留足余量）
 
   await autoArchiveExpiredEvents().catch(() => {});
+
+  // 清理失效的设备绑定：超过活跃窗口（DEVICE_ACTIVE_DAYS）未刷新的绑定置为
+  // enabled=false，让库内状态与「实际仍在登录的设备」一致。
+  // 覆盖令牌自然过期、App 卸载、切换站点后未解绑等无法主动解绑的情形；
+  // 推送侧另有同样窗口的过滤（双保险，避免清理失败时误推）。
+  await prisma.device
+    .updateMany({
+      where: { enabled: true, lastSeenAt: { lt: activeDeviceCutoff() } },
+      data: { enabled: false },
+    })
+    .catch(() => {});
 
   const events = await prisma.event.findMany({
     where: { status: "UPCOMING", eventTime: { gt: new Date(now), lte: new Date(now + horizonMs) } },

@@ -79,6 +79,21 @@ async function sendToRegistrationIds(
 // 返回「成功下发到至少一台设备的用户」集合：
 // 调用方据此记账（写 PushLog），避免给没有设备/发送失败的用户也记为已推送，
 // 否则这些用户之后绑定设备将永远收不到该条通知
+// 设备绑定的「活跃」判定窗口（天）。
+//
+// App 登录成功后与每轮后台轮询都会幂等重报绑定（刷新 Device.lastSeenAt），
+// 因此 lastSeenAt 可视为「该设备仍在活跃登录」的心跳。超过该窗口未刷新，
+// 说明令牌已失效（被动 401 无法主动解绑）、App 已卸载、或用户已切换站点，
+// 这类残留绑定不应再收推送（否则前一位登录者的通知会继续出现在设备上）。
+//
+// 取 30 天与 App 令牌有效期对齐：令牌过期后 App 无法再刷新绑定，
+// 且不会误伤被国产 ROM 延迟 WorkManager 的正常用户。
+export const DEVICE_ACTIVE_DAYS = 30;
+
+export function activeDeviceCutoff(): Date {
+  return new Date(Date.now() - DEVICE_ACTIVE_DAYS * 24 * 60 * 60 * 1000);
+}
+
 async function pushToUsers(
   userIds: string[],
   payload: PushPayload
@@ -86,7 +101,12 @@ async function pushToUsers(
   const sentUsers = new Set<string>();
   if (userIds.length === 0) return sentUsers;
   const devices = await prisma.device.findMany({
-    where: { userId: { in: userIds }, enabled: true },
+    where: {
+      userId: { in: userIds },
+      enabled: true,
+      // 只推给仍活跃的绑定，避免向长期未刷新的残留设备推送（见上方说明）
+      lastSeenAt: { gte: activeDeviceCutoff() },
+    },
     select: { userId: true, registrationId: true },
   });
   if (devices.length === 0) return sentUsers;
